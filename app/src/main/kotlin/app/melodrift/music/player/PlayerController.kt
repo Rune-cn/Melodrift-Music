@@ -396,21 +396,31 @@ object PlayerController {
         }
         currentIndex = index
         val song = queue[index]
+        // 两个异步任务的过期判定用「index 未变 且 该 index 上的歌仍是发起请求的那首」：
+        // 只看 index 会漏掉队列被整体替换 / 拖拽排序（moveInQueue）/ 删除条目
+        // （removeFromQueue）后同一 index 指向另一首歌的情况 —— 过期响应被放行，
+        // 表现为"放的是这首、歌词是上首"；再加上 id 校验才能同时挡住
+        // 队列里同一首歌出现两次时快速连点两个位置（只该保留最后一次）。
+        val songId = song.id
         errorText = null
         isLoading = true
         durationMs = 0L
         positionMs = 0L
+        // 切歌立即清空歌词：否则新歌加载期间显示的是上一首的歌词
+        // （连点时即使最终会被正确覆盖，中间那段也是"歌词对不上"）
+        lyrics = emptyList()
+        translatedLyrics = emptyList()
         // 队列快照落盘：重开 App 后迷你条恢复上次歌曲
         persistQueue()
 
         // 歌词（IO）
         scope.launch {
             val r = try {
-                withContext(Dispatchers.IO) { NcmApi.lyric(song.id) }
+                withContext(Dispatchers.IO) { NcmApi.lyric(songId) }
             } catch (_: Exception) {
                 null
             }
-            if (currentIndex != index) return@launch
+            if (currentIndex != index || current?.id != songId) return@launch
             lyrics = r?.lrc ?: emptyList()
             translatedLyrics = r?.translated ?: emptyList()
         }
@@ -418,11 +428,11 @@ object PlayerController {
         // 播放地址（IO）→ 主线程播放
         scope.launch {
             val url = try {
-                withContext(Dispatchers.IO) { NcmApi.songUrlSmart(song.id, qualityLevel) }
+                withContext(Dispatchers.IO) { NcmApi.songUrlSmart(songId, qualityLevel) }
             } catch (_: Exception) {
                 null
             }
-            if (currentIndex != index) return@launch
+            if (currentIndex != index || current?.id != songId) return@launch
             isLoading = false
             if (url.isNullOrBlank()) {
                 errorText = "no_url"
@@ -448,12 +458,14 @@ object PlayerController {
         }
     }
 
-    /** 记录播放历史（去重，最新在前，最多 20 条；持久化到本地） */
+    /** 记录播放历史（去重，最新在前，上限与 [PlayHistoryStore.MAX] 一致 = 50） */
     private fun recordHistory(song: Song) {
         val list = playHistory.toMutableList()
         list.removeAll { it.id == song.id }
         list.add(0, song)
-        if (list.size > 20) list.subList(20, list.size).clear()
+        // 与持久化上限保持一致：原来这里截到 20，而 PlayHistoryStore 存 50，
+        // 导致"当次会话只显示 20 条、重启后变 50 条"的不一致
+        if (list.size > 50) list.subList(50, list.size).clear()
         playHistory = list
         val ctx = appContext
         if (ctx != null) PlayHistoryStore.addId(ctx, song.id)

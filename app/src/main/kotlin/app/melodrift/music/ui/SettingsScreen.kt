@@ -13,6 +13,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -48,9 +49,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -400,6 +403,27 @@ private fun SettingsSectionPage(
             SettingsSection.ABOUT -> {
                 var legalKind by remember { mutableStateOf<String?>(null) }
                 var crashLogText by remember { mutableStateOf<String?>(null) }
+                // 应用图标：居中置顶，在所有设置项之上（自带浅灰底，故裁成圆角方形即可）
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 24.dp, bottom = 24.dp)
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.ic_app_logo),
+                        contentDescription = stringResource(R.string.app_name),
+                        modifier = Modifier
+                            .size(88.dp)
+                            .clip(RoundedCornerShape(22.dp))
+                    )
+                    Spacer(Modifier.height(12.dp))
+                    Text(
+                        stringResource(R.string.app_name),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
                 SettingsCard {
                     SettingsRow(
                         title = stringResource(R.string.app_name),
@@ -412,6 +436,19 @@ private fun SettingsSectionPage(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
+                    )
+                    SettingsRow(
+                        title = stringResource(R.string.github_repo),
+                        trailing = {
+                            // 用自有矢量（material-icons-extended 里没有 GitHub 品牌图标）
+                            Icon(
+                                painter = painterResource(R.drawable.ic_github),
+                                contentDescription = stringResource(R.string.github_repo),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        },
+                        onClick = { openExternalUrl(ctx, GITHUB_URL) }
                     )
                     SettingsRow(
                         title = stringResource(R.string.terms_title),

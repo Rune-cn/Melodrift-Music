@@ -1,7 +1,10 @@
 package app.melodrift.music.ui
 
 import android.Manifest
+import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -611,5 +614,20 @@ fun rememberStoragePermissionGuard(): (action: () -> Unit) -> Unit {
             pending = action
             launcher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
         }
+    }
+}
+
+
+/** 项目仓库地址（关于页 GitHub 入口） */
+const val GITHUB_URL = "https://github.com/Rune-cn/Melodrift-Music"
+
+/** 用系统浏览器打开外链；没有可用浏览器时提示而不是抛异常崩掉 */
+fun openExternalUrl(context: Context, url: String) {
+    val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+    try {
+        context.startActivity(intent)
+    } catch (_: Exception) {
+        Toast.makeText(context, R.string.no_browser, Toast.LENGTH_SHORT).show()
     }
 }

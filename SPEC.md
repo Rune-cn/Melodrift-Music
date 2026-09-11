@@ -8,7 +8,7 @@
 | 项 | 值 |
 |------|------|
 | 命名空间 / applicationId | `app.melodrift.music` |
-| 版本 | 1.0.2（versionCode 3） |
+| 版本 | 1.0.3（versionCode 4） |
 | compileSdk / targetSdk / minSdk | 37 / **36（Android 16）** / 26 |
 | ABI | 仅 `arm64-v8a` |
 | 语言资源 | 仅 `zh-rCN` + `en`（`resourceConfigurations`）。注意英文是**默认 `values/`**，
@@ -56,6 +56,9 @@ util ────────────── CrashLog
   尚未接入），别误以为 eapi 链路已经跑通。
 - `NcmApi`：单例 `OkHttpClient`；`cookie` 由设置页注入（含 `MUSIC_U` / `__csrf`）；
   写操作（红心 / 收藏 / 建删歌单）返回 `Boolean`/`Long`，读操作返回 `Models.kt` 里的数据类。
+- **`csrfToken()` 必须取 cookie 里最后一个 `__csrf`**：用户粘贴的 cookie 常同时带着旧会话
+  和新会话两份 `__csrf`，服务端只认最后那份；取第一份会让写操作统一返回
+  `403 illegal request!`（v1.0.2 及之前"删除歌单失败"的根因）。
 - **`playlistDetail` 必须保留 trackIds 兜底**：`/api/v6/playlist/detail` 对部分请求只回
   `trackIds` 不回 `tracks`（大歌单/登录态等场景），`tracks` 为空时走
   `songsDetail(trackIds)` 批量详情并按原序排回 —— 删掉它会出现"第一次进歌单有歌、
@@ -96,6 +99,12 @@ util ────────────── CrashLog
   **播放态变化、`seekTo`、`updatePosition`、`setSpeed`、`updateNotification`**。
 - `PlaybackStateCompat` 的 actions 位掩码提为常量 `sessionActions`，不要每次重建。
 - 断点续播：播放中每 5 秒落盘一次位置，暂停时立即落盘（`savePlaybackPosition`）。
+- **异步响应过期判定（v1.0.3 修）**：`playIndex` 里歌词与播放地址两个 `scope.launch`
+  必须同时校验 `currentIndex == index && current?.id == songId`。只判 index 会漏掉
+  "队列被整体替换 / 拖拽排序 `moveInQueue` / 删除条目 `removeFromQueue` 后同一 index
+  指向另一首歌"的情况，过期歌词响应被放行 → 连点切歌后"放的是这首、歌词是上首"；
+  只判 id 又挡不住队列里同一首歌出现两次时连点两个位置。切歌瞬间还要
+  `lyrics = emptyList()`，否则新歌加载期间显示的是上一首歌词。
 - **切歌过渡期不变量（`exoSongId`，破坏它会复现"新歌跳过一段"bug）**：
   `playIndex` 先更新 `currentIndex`、异步拉到播放地址后才真正 `playUrl` 切换播放器，
   期间 `current`（新歌）与 `exo` 在放的（旧歌）**不一致**。所有"读 `positionMs` /
@@ -161,7 +170,7 @@ util ────────────── CrashLog
 ### 5.5 资源与文案
 
 - 全部文案进 `values/strings.xml`（en）+ `values-zh-rCN/strings.xml`（zh），**key 与中英一一对应**
-  （当前各 192 条，可用 `diff <(grep -o 'name="…"' values/strings.xml|sort) <(… values-zh-rCN/…|sort)` 校验）；
+  （当前各 194 条，可用 `diff <(grep -o 'name="…"' values/strings.xml|sort) <(… values-zh-rCN/…|sort)` 校验）；
   ui 层一律 `stringResource()`，不得新增硬编码文案。
 - **已知例外（待办，见 §8）**：`net/` 层异常文案与兜底名仍是中文字面量
   （`"未登录：cookie 中缺少有效的 MUSIC_U"`、`"每日推荐为空（可能未登录）"`、`"歌单不存在"`、
@@ -178,7 +187,7 @@ util ────────────── CrashLog
 |---|---|---|
 | `SettingsRepository` | 全部设置项 | SP `settings`，字段名即 key，`save { copy() }` 全量写回 |
 | `QueueStore` | 播放队列快照（ids+index+进度） | 重开 App 后迷你条恢复上次歌曲，**不自动播放**；点播放按断点续播 |
-| `PlayHistoryStore` | 听歌历史 id 列表 | 最新在前、去重、上限 50 |
+| `PlayHistoryStore` | 听歌历史 id 列表 | 最新在前、去重、上限 50；内存里的 `playHistory` 与它同上限（v1.0.2 前内存截 20，导致"当次只显示 20、重启变 50"） |
 | `PlaybackPositions` | 每首歌的播放位置 | 断点续播 |
 | `SavedPlaylists` | songId → 收藏到的歌单集合 | 本地补全"收藏到任意歌单即点亮红心" |
 | `SavedSongsCache` | 自建歌单歌曲 id 并集 | 服务端数据，TTL 5 分钟，写操作后 `invalidate()` |

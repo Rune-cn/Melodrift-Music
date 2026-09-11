@@ -36,9 +36,21 @@ object NcmApi {
     /** 暴露给 ExoPlayer 的 OkHttp 数据源复用 */
     fun httpClient(): OkHttpClient = client
 
-    /** 从 cookie 提取 __csrf */
-    fun csrfToken(): String =
-        cookie.substringAfter("__csrf=", "").substringBefore(";").trim()
+    /**
+     * 从 cookie 提取 `__csrf`。
+     *
+     * **必须取最后一个**：粘贴进来的 cookie 常含两份 `__csrf`（旧会话残留 + 当前值），
+     * 服务端只认最后那份；取第一个会让所有写操作返回 `403 illegal request!`
+     * （删除歌单失败的真实原因即在此）。
+     */
+    fun csrfToken(): String {
+        var token = ""
+        for (part in cookie.split(';')) {
+            val kv = part.trim()
+            if (kv.startsWith("__csrf=")) token = kv.removePrefix("__csrf=")
+        }
+        return token.trim()
+    }
 
     private fun headers(writeCookie: Boolean = false): Headers = Headers.Builder()
         .add("User-Agent", USER_AGENT)
