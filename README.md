@@ -6,6 +6,7 @@
 - 包名 `app.melodrift.music` · 当前版本 **1.0.2**（versionCode 3）
 - `minSdk 26` / `targetSdk 36`（Android 16）/ `compileSdk 37`，仅打包 **arm64-v8a**
 - 界面语言：中 / 英（应用内即时切换，不重建 Activity）
+- 许可：**GPL-3.0-only** · 非官方客户端声明见 [`NOTICE`](NOTICE)
 
 > 技术细节与规范见 [`SPEC.md`](SPEC.md)；设计任务书与播放器定案见 [`docs/`](docs/)。
 
@@ -82,6 +83,7 @@ keytool -genkeypair -v -keystore melodrift.keystore -alias melodrift \
 ```
 melodrift-music/
 ├── README.md / SPEC.md                 # 本说明 / 技术规范
+├── LICENSE / NOTICE                    # GPL-3.0-only 全文 / 非官方声明与使用限制
 ├── docs/                               # 设计任务书 + 播放器技术定案
 ├── settings.gradle.kts                 # 阿里云镜像仓库 + flatDir(libs)
 ├── build.gradle.kts                    # AGP / Kotlin compose 插件版本
@@ -112,3 +114,22 @@ melodrift-music/
 - 逐字歌词（KRC）未实现，当前为普通 YRC/文本歌词
 - 媒体会话仍基于 `androidx.media` 的 `MediaSessionCompat`（该库 1.8.0 起整体标记废弃），
   迁移到 `androidx.media3.session` 是待办项，详见 `SPEC.md`「技术债」
+
+## 许可
+
+- 代码以 **GPL-3.0-only** 授权，全文见 [`LICENSE`](LICENSE)，版权 `Copyright © 2026 Rune-cn`
+- 安装使用前请先阅读 [`NOTICE`](NOTICE)：无关联声明、使用限制与免责条款
+- 衍生作品必须以同一许可公开源码，并保留版权声明；请勿以 "Melodrift Music"
+  官方名义分发修改版本
+
+## 签名校验
+
+所有正式构建均由同一密钥签名（密钥库**不**随源码分发）。安装前可比对证书指纹：
+
+```bash
+apksigner verify --print-certs melodrift-music-v1.0.2-arm64-v8a.apk
+# Signer #1 certificate DN: CN=Melodrift Music, OU=App, O=Melodrift, L=Internet, ST=Internet, C=CN
+# Signer #1 certificate SHA-256 digest: a23f2a54243069e53e85a12accfd236dd51464c2b561f88aa333582c4b933276
+```
+
+指纹与上面不一致的 APK 不是本仓库的构建产物，请勿安装。
