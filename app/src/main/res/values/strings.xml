@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Melodrift Music</string>
+
+    <string name="nav_home">Discover</string>
+    <string name="nav_search">Search</string>
+    <string name="nav_settings">Settings</string>
+    <string name="library_liked_songs">Liked Songs</string>
+    <string name="library_subscribed">Subscribed Playlists</string>
+    <string name="library_created">My Playlists</string>
+    <string name="library_no_liked">No liked songs yet</string>
+    <string name="library_no_subscribed">No subscribed playlists</string>
+    <string name="library_no_created">No playlists created</string>
+    <string name="subscribe">Subscribe</string>
+    <string name="unsubscribe">Unsubscribe</string>
+    <string name="more_actions">More</string>
+    <string name="like_tip">Liked</string>
+    <string name="queue">Queue</string>
+    <string name="queue_empty">Queue is empty</string>
+    <string name="queue_drag_hint">Long-press a row and drag to reorder</string>
+    <string name="queue_remove">Remove</string>
+    <string name="close">Close</string>
+
+    <string name="op_failed">Operation failed</string>
+    <string name="detail">Song details</string>
+    <string name="download">Download</string>
+    <string name="downloading">Downloading…</string>
+    <string name="downloaded">Saved to Downloads</string>
+    <string name="pull_to_refresh">Release to refresh</string>
+    <string name="download_failed">Download failed</string>
+    <string name="download_quality_tip">Choose quality</string>
+    <string name="quality_current">Current</string>
+    <string name="download_no_url">Cannot fetch playable URL — song may require VIP or be copyright-restricted</string>
+    <string name="download_http">Download failed (HTTP error)</string>
+    <string name="download_failed_reason">Download failed: %1$s</string>
+    <string name="quality_standard">Standard</string>
+    <string name="quality_exhigh">High</string>
+    <string name="quality_lossless">Lossless</string>
+    <string name="quality_hires">Hi-Res</string>
+    <string name="speed_1x">1.0x</string>
+    <string name="speed_format">%1$sx</string>
+    <string name="timer_remain_minutes">%1$d m</string>
+    <string name="detail_name">Name</string>
+    <string name="detail_artist">Artist</string>
+    <string name="detail_album">Album</string>
+    <string name="detail_duration">Duration</string>
+    <string name="detail_quality">Quality</string>
+    <string name="detail_status">Status</string>
+    <string name="detail_vip">VIP song (membership required)</string>
+    <string name="detail_free">Free</string>
+
+    <string name="like">Like</string>
+    <string name="unlike">Unlike</string>
+    <string name="liked_tip">Liked</string>
+    <string name="unliked_tip">Unliked</string>
+    <string name="subscribed">Subscribed</string>
+    <string name="unsubscribed">Unsubscribed</string>
+
+
+    <string name="nav_library">Favorites</string>
+
+
+    <!-- 首页 -->
+    <string name="daily_recommend">Daily Recommend</string>
+    <string name="daily_recommend_desc">Tailored for you every day</string>
+    <string name="recommended_playlists">Recommended Playlists</string>
+    <string name="toplists">Charts</string>
+    <string name="hello_guest">Hi, guest</string>
+    <string name="hello_user">Hi, %s</string>
+    <string name="not_logged_in">Add your NetEase cookie in Settings to unlock personalized content.</string>
+    <string name="toplist_hits">Hottest Songs</string>
+    <string name="toplist_new">New Songs</string>
+    <string name="toplist_original">Original</string>
+    <string name="retry">Retry</string>
+    <string name="back30">Back 30s</string>
+    <string name="fwd30">Forward 30s</string>
+    <string name="loop_list">List loop</string>
+    <string name="loop_one">Repeat one</string>
+    <string name="loop_shuffle">Shuffle</string>
+    <string name="timer_off">Off</string>
+    <string name="timer_minutes">%1$d min</string>
+
+    <string name="loading">Loading…</string>
+    <string name="load_failed">Load failed</string>
+
+    <!-- 歌单 / 歌曲 -->
+    <string name="play_count">%s plays</string>
+    <string name="track_count">%d tracks</string>
+    <string name="play_all">Play all</string>
+    <string name="no_tracks">No playable tracks (may be restricted)</string>
+
+    <!-- 播放器 -->
+    <string name="prev">Previous</string>
+    <string name="play">Play</string>
+    <string name="pause">Pause</string>
+    <string name="mini_bar_idle_title">Melodrift</string>
+    <string name="mini_bar_idle_subtitle">Pick a song to start</string>
+    <string name="next">Next</string>
+    <string name="lyrics">Lyrics</string>
+    <string name="no_lyrics">No lyrics</string>
+    <string name="song_source">Source: standard quality</string>
+    <string name="play_failed">Playback failed (%1$s)</string>
+    <string name="song_unavailable">This song requires VIP or is copyright-restricted.
+Make sure a valid cookie (MUSIC_U) is set in Settings.</string>
+
+    <!-- 搜索 -->
+    <string name="search_hint">Search songs, artists, playlists…</string>
+    <string name="search_empty">Type keywords to search</string>
+    <string name="search_songs">Songs</string>
+    <string name="search_playlists">Playlists</string>
+    <string name="search_artists">Artists</string>
+    <string name="search_history">Search history</string>
+    <string name="search_history_clear">Clear</string>
+    <string name="search_history_hint">Tap to search again · long-press to delete</string>
+    <string name="delete">Delete</string>
+    <string name="no_result">No results for “%s”</string>
+
+    <!-- 设置 -->
+    <string name="appearance">Appearance</string>
+    <string name="dark_mode">Dark Mode</string>
+    <string name="dark_mode_system">Follow system</string>
+    <string name="dark_mode_light">Light</string>
+    <string name="dark_mode_dark">Dark</string>
+    <string name="language">Language</string>
+    <string name="language_system">Follow system</string>
+    <string name="language_zh">中文</string>
+    <string name="language_en">English</string>
+
+    <string name="account">Account</string>
+    <string name="cookie">Cookie</string>
+    <string name="cookie_set">Saved</string>
+    <string name="cookie_unset">Not set</string>
+    <string name="cookie_empty">Cookie is empty — paste it first</string>
+    <string name="cookie_placeholder">NMTID=…; MUSIC_U=…; __csrf=…</string>
+    <string name="cookie_test">Test connection</string>
+    <string name="cookie_testing">Testing…</string>
+    <string name="cookie_ok">Connected as %s</string>
+    <string name="cookie_error">Connection failed: %s</string>
+
+    <string name="about">About</string>
+    <string name="version_code">Version %1$s (%2$d)</string>
+    <string name="privacy_brief">We do not collect any of your information</string>
+    <string name="disclaimer_brief">Unofficial client — no cracking features</string>
+    <string name="view_on_github">Unofficial client — use at your own risk</string>
+
+    <string name="terms_title">User Agreement</string>
+    <string name="privacy_title">Privacy Policy</string>
+    <string name="disclaimer_title">Disclaimer</string>
+    <string name="legal_welcome_title">Welcome</string>
+    <string name="legal_welcome_desc">Please read and agree to the following before continuing</string>
+    <string name="agree_and_continue">Agree &amp; continue</string>
+    <string name="terms_text">1. This is an unofficial third-party client for NetEase Cloud Music (163.com). It is not affiliated with, endorsed by, or sponsored by NetEase.\n2. By using this app you agree to comply with all applicable laws and the terms of service of the original platform.\n3. This app is provided for personal learning and study purposes only. You are solely responsible for the consequences of your use.\n4. We may update this agreement at any time; continued use of the app constitutes acceptance of the updated terms.</string>
+    <string name="privacy_text">1. This app does NOT collect, upload, or share any of your personal information.\n2. Your login cookie is stored ONLY on this device (local storage) and is used solely to access the music API. It is never transmitted to any third party.\n3. Play history, search history, and settings are stored locally on your device.\n4. Network requests are made only to the official NetEase Cloud Music API for normal functionality (search, playback, playlists).\n5. If you uninstall the app, all local data is deleted.</string>
+    <string name="disclaimer_text">1. This is an independent third-party client and has NO cracking, unlocking, or fee-evasion functions. VIP-only songs require a legitimate account to play.\n2. All music content and copyrights belong to their respective owners (NetEase Cloud Music).\n3. This app is provided free of charge; the developer is not liable for any issues or losses caused by network, account, or other reasons.\n4. This app is for personal learning and study only. Do not use it for commercial purposes.</string>
+
+    <string name="create_playlist">New playlist</string>
+    <string name="create_playlist_desc">Give your new playlist a name</string>
+    <string name="create_playlist_hint">Playlist name</string>
+    <string name="create">Create</string>
+    <string name="create_ok">Playlist created</string>
+    <string name="create_failed">Create failed</string>
+    <string name="add_to_playlist">Add to playlist</string>
+    <string name="add_to_playlist_ok">Added to %1$s</string>
+    <string name="remove_from_playlist_ok">Removed from %1$s</string>
+    <string name="liked_playlist_hint">Liked songs</string>
+    <string name="my_playlist_hint">My playlist</string>
+    <string name="playlist_picker_hint">Check playlists to add, uncheck to remove. Save to apply.</string>
+    <string name="playlists_selected">%1$d/%2$d selected</string>
+    <string name="playlists_saved">Updated %1$d playlists</string>
+    <string name="save">Save</string>
+    <string name="select_all">Select all</string>
+    <string name="clear_all">Clear</string>
+    <string name="song_name_copied">Song name copied</string>
+    <string name="crash_log">Crash log</string>
+    <string name="no_crash_log">No crash log</string>
+    <string name="copy">Copy</string>
+    <string name="copied">Copied</string>
+    <string name="no_playlists">No playlists yet — create one in Library</string>
+    <string name="play_history">Play history</string>
+
+    <string name="settings_playback">Playback</string>
+    <string name="settings_playback_desc">Default quality, crossfade, mixed audio</string>
+    <string name="settings_appearance_desc">Dark mode, language</string>
+    <string name="settings_about_desc">Version and about</string>
+    <string name="default_quality">Default quality</string>
+    <string name="default_quality_desc">Default quality for newly played songs</string>
+    <string name="crossfade">Crossfade</string>
+    <string name="crossfade_desc">Fade out previous song and fade in next</string>
+    <string name="crossfade_duration">Crossfade duration</string>
+    <string name="seconds_format">%1$d s</string>
+    <string name="allow_mixed_audio">Play with other apps</string>
+    <string name="allow_mixed_audio_desc">Don\'t take over the system audio focus</string>
+    <string name="resume_playback">Resume playback position</string>
+    <string name="resume_playback_desc">Continue each song from where you left off</string>
+    <string name="minibar_style">Player bar style</string>
+    <string name="minibar_style_desc">Square / Rounded</string>
+    <string name="minibar_square">Square</string>
+    <string name="minibar_rounded">Rounded</string>
+    <string name="progress_style">Progress bar style</string>
+    <string name="progress_style_desc">Standard / Wave</string>
+    <string name="progress_standard">Standard</string>
+    <string name="progress_wave">Wave</string>
+    <string name="lyrics_fade">Lyrics edge fade</string>
+    <string name="lyrics_fade_desc">Fade out at top/bottom of the lyrics page</string>
+    <string name="player_status_bar">Show status bar on player</string>
+    <string name="player_status_bar_desc">Turn off to hide the status bar in the player page</string>
+
+    <string name="delete_playlist">Delete playlist</string>
+    <string name="delete_playlist_confirm">Delete this playlist? This cannot be undone.</string>
+    <string name="delete_ok">Deleted</string>
+    <string name="delete_failed">Delete failed</string>
+    <string name="download_all">Download all</string>
+    <string name="download_all_progress">Downloading %1$d/%2$d…</string>
+    <string name="download_all_done">Done: %1$d saved, %2$d failed</string>
+
+    <string name="cancel">Cancel</string>
+    <string name="confirm">OK</string>
+    <string name="back">Back</string>
+</resources>

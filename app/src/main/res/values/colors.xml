@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 桌面图标背景（用户指定浅灰） -->
+    <color name="ic_launcher_background">#F0F1F3</color>
+    <!-- 测试连接成功等正向提示绿 -->
+    <color name="success_green">#FF2E7D32</color>
+</resources>

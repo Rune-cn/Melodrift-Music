@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Melodrift Music</string>
+
+    <string name="nav_home">发现</string>
+    <string name="nav_search">搜索</string>
+    <string name="nav_settings">设置</string>
+    <string name="library_liked_songs">我喜欢的音乐</string>
+    <string name="library_subscribed">收藏的歌单</string>
+    <string name="library_created">创建的歌单</string>
+    <string name="library_no_liked">还没有喜欢的歌曲</string>
+    <string name="library_no_subscribed">还没有收藏歌单</string>
+    <string name="library_no_created">还没有创建歌单</string>
+    <string name="subscribe">收藏歌单</string>
+    <string name="unsubscribe">取消收藏</string>
+    <string name="more_actions">更多</string>
+    <string name="like_tip">已喜欢</string>
+    <string name="queue">播放列表</string>
+    <string name="queue_empty">队列为空</string>
+    <string name="queue_drag_hint">长按歌名拖动调整顺序</string>
+    <string name="queue_remove">移除</string>
+    <string name="close">关闭</string>
+
+    <string name="op_failed">操作失败</string>
+    <string name="detail">歌曲信息</string>
+    <string name="download">下载</string>
+    <string name="downloading">下载中…</string>
+    <string name="downloaded">已保存到下载目录</string>
+    <string name="pull_to_refresh">松手刷新</string>
+    <string name="download_failed">下载失败</string>
+    <string name="download_quality_tip">选择下载音质</string>
+    <string name="quality_current">当前</string>
+    <string name="download_no_url">获取播放地址失败，歌曲可能需会员或受版权限制</string>
+    <string name="download_http">下载失败（网络/CDN 错误）</string>
+    <string name="download_failed_reason">下载失败：%1$s</string>
+    <string name="quality_standard">标准</string>
+    <string name="quality_exhigh">较高</string>
+    <string name="quality_lossless">无损</string>
+    <string name="quality_hires">Hi-Res</string>
+    <string name="speed_1x">1.0x</string>
+    <string name="speed_format">%1$sx</string>
+    <string name="timer_remain_minutes">%1$d 分钟</string>
+    <string name="detail_name">歌名</string>
+    <string name="detail_artist">歌手</string>
+    <string name="detail_album">专辑</string>
+    <string name="detail_duration">时长</string>
+    <string name="detail_quality">音质</string>
+    <string name="detail_status">状态</string>
+    <string name="detail_vip">VIP 歌曲（需会员）</string>
+    <string name="detail_free">免费歌曲</string>
+
+    <string name="like">喜欢</string>
+    <string name="unlike">取消喜欢</string>
+    <string name="liked_tip">已喜欢</string>
+    <string name="unliked_tip">已取消</string>
+    <string name="subscribed">已收藏</string>
+    <string name="unsubscribed">已取消收藏</string>
+
+
+    <string name="nav_library">收藏</string>
+
+
+    <!-- 首页 -->
+    <string name="daily_recommend">每日推荐</string>
+    <string name="daily_recommend_desc">每天为你定制</string>
+    <string name="recommended_playlists">推荐歌单</string>
+    <string name="toplists">排行榜</string>
+    <string name="hello_guest">你好，游客</string>
+    <string name="hello_user">你好，%s</string>
+    <string name="not_logged_in">在设置中填入网易云 Cookie 后即可解锁个性化内容。</string>
+    <string name="toplist_hits">热歌榜</string>
+    <string name="toplist_new">新歌榜</string>
+    <string name="toplist_original">原创榜</string>
+    <string name="retry">重试</string>
+    <string name="back30">后退30秒</string>
+    <string name="fwd30">快进30秒</string>
+    <string name="loop_list">列表循环</string>
+    <string name="loop_one">单曲循环</string>
+    <string name="loop_shuffle">随机播放</string>
+    <string name="timer_off">关闭</string>
+    <string name="timer_minutes">%1$d 分钟</string>
+
+    <string name="loading">加载中…</string>
+    <string name="load_failed">加载失败</string>
+
+    <!-- 歌单 / 歌曲 -->
+    <string name="play_count">%s 次播放</string>
+    <string name="track_count">%d 首</string>
+    <string name="play_all">播放全部</string>
+    <string name="no_tracks">无可播放歌曲（可能受版权限制）</string>
+
+    <!-- 播放器 -->
+    <string name="prev">上一首</string>
+    <string name="play">播放</string>
+    <string name="pause">暂停</string>
+    <string name="mini_bar_idle_title">Melodrift</string>
+    <string name="mini_bar_idle_subtitle">选择一首歌开始播放</string>
+    <string name="next">下一首</string>
+    <string name="lyrics">歌词</string>
+    <string name="no_lyrics">暂无歌词</string>
+    <string name="song_source">标准音质</string>
+    <string name="play_failed">播放失败（错误码 %1$s）</string>
+    <string name="song_unavailable">该歌曲需会员或受版权限制，无法获取试听地址。
+请在设置中确认已填入有效 Cookie（含 MUSIC_U）。</string>
+
+    <!-- 搜索 -->
+    <string name="search_hint">搜索歌曲、歌手、歌单…</string>
+    <string name="search_empty">输入关键词开始搜索</string>
+    <string name="search_songs">歌曲</string>
+    <string name="search_playlists">歌单</string>
+    <string name="search_artists">歌手</string>
+    <string name="search_history">搜索历史</string>
+    <string name="search_history_clear">清空</string>
+    <string name="search_history_hint">点击再次搜索 · 长按删除单条</string>
+    <string name="delete">删除</string>
+    <string name="no_result">未找到“%s”的相关结果</string>
+
+    <!-- 设置 -->
+    <string name="appearance">外观</string>
+    <string name="dark_mode">深色模式</string>
+    <string name="dark_mode_system">跟随系统</string>
+    <string name="dark_mode_light">浅色</string>
+    <string name="dark_mode_dark">深色</string>
+    <string name="language">语言</string>
+    <string name="language_system">跟随系统</string>
+    <string name="language_zh">中文</string>
+    <string name="language_en">English</string>
+
+    <string name="account">账号</string>
+    <string name="cookie">Cookie</string>
+    <string name="cookie_set">已设置</string>
+    <string name="cookie_unset">未设置</string>
+    <string name="cookie_empty">Cookie 为空，请先粘贴</string>
+    <string name="cookie_placeholder">NMTID=…; MUSIC_U=…; __csrf=…</string>
+    <string name="cookie_test">测试连接</string>
+    <string name="cookie_testing">测试中…</string>
+    <string name="cookie_ok">连接成功：%s</string>
+    <string name="cookie_error">连接失败：%s</string>
+
+    <string name="about">关于</string>
+    <string name="version_code">版本 %1$s (%2$d)</string>
+    <string name="privacy_brief">本应用不收集您的任何信息</string>
+    <string name="disclaimer_brief">非官方客户端，无破解功能</string>
+    <string name="view_on_github">非官方客户端，请自担风险</string>
+
+    <string name="terms_title">用户协议</string>
+    <string name="privacy_title">隐私政策</string>
+    <string name="disclaimer_title">免责声明</string>
+    <string name="legal_welcome_title">欢迎使用</string>
+    <string name="legal_welcome_desc">在使用前，请阅读并同意以下条款</string>
+    <string name="agree_and_continue">同意并继续</string>
+    <string name="terms_text">1. 本应用是网易云音乐（music.163.com）的非官方第三方客户端，与网易公司无任何隶属、合作或授权关系。\n2. 使用本应用即表示您同意遵守相关法律法规及原平台的服务条款。\n3. 本应用仅供个人学习研究使用，因使用本应用产生的一切后果由您自行承担。\n4. 我们可能随时更新本协议，继续使用本应用即视为接受更新后的条款。</string>
+    <string name="privacy_text">1. 本应用不收集、不上传、不共享您的任何个人信息。\n2. 您的登录 Cookie 仅保存在本设备本地存储中，仅用于访问音乐接口，绝不会传输给任何第三方。\n3. 播放历史、搜索历史、设置等数据均保存在您的设备本地。\n4. 网络请求仅用于正常功能（搜索、播放、歌单等），只访问网易云音乐官方接口。\n5. 卸载应用后，所有本地数据将被清除。</string>
+    <string name="disclaimer_text">1. 本应用是独立第三方客户端，没有任何破解、解锁、绕过付费功能。VIP 歌曲需要您使用合法账号才能播放。\n2. 音乐内容及版权均归原权利方（网易云音乐）所有。\n3. 本应用免费提供，因网络、账号或其他原因导致的任何异常或损失，开发者不承担责任。\n4. 本应用仅供个人学习研究使用，请勿用于商业用途。</string>
+
+    <string name="create_playlist">新建歌单</string>
+    <string name="create_playlist_desc">给你的新歌单起个名字</string>
+    <string name="create_playlist_hint">歌单名称</string>
+    <string name="create">创建</string>
+    <string name="create_ok">已创建歌单</string>
+    <string name="create_failed">创建失败</string>
+    <string name="add_to_playlist">收藏到指定歌单</string>
+    <string name="add_to_playlist_ok">已添加到 %1$s</string>
+    <string name="remove_from_playlist_ok">已从 %1$s 移除</string>
+    <string name="liked_playlist_hint">我喜欢的音乐</string>
+    <string name="my_playlist_hint">我的歌单</string>
+    <string name="playlist_picker_hint">勾选要收藏的歌单，取消勾选即移出，保存后生效</string>
+    <string name="playlists_selected">已选 %1$d/%2$d</string>
+    <string name="playlists_saved">已更新 %1$d 个歌单</string>
+    <string name="save">保存</string>
+    <string name="select_all">全选</string>
+    <string name="clear_all">清空</string>
+    <string name="song_name_copied">歌名已复制</string>
+    <string name="crash_log">崩溃日志</string>
+    <string name="no_crash_log">暂无崩溃日志</string>
+    <string name="copy">复制</string>
+    <string name="copied">已复制</string>
+    <string name="no_playlists">还没有歌单，去收藏页新建一个吧</string>
+    <string name="play_history">播放历史</string>
+
+    <string name="settings_playback">播放</string>
+    <string name="settings_playback_desc">默认音质、淡入淡出、混音</string>
+    <string name="settings_appearance_desc">深色模式、语言</string>
+    <string name="settings_about_desc">版本与关于</string>
+    <string name="default_quality">默认播放音质</string>
+    <string name="default_quality_desc">新播放的歌曲默认使用该音质</string>
+    <string name="crossfade">淡入淡出</string>
+    <string name="crossfade_desc">切歌时上一首减弱、下一首渐强</string>
+    <string name="crossfade_duration">淡入淡出时长</string>
+    <string name="seconds_format">%1$d 秒</string>
+    <string name="allow_mixed_audio">允许与其他应用同时播放</string>
+    <string name="allow_mixed_audio_desc">不独占系统音频焦点</string>
+    <string name="resume_playback">恢复播放位置</string>
+    <string name="resume_playback_desc">再次播放同一首歌时从上次位置继续</string>
+    <string name="minibar_style">播放器底部样式</string>
+    <string name="minibar_style_desc">方形 / 圆角</string>
+    <string name="minibar_square">方形</string>
+    <string name="minibar_rounded">圆角</string>
+    <string name="progress_style">进度条样式</string>
+    <string name="progress_style_desc">标准 / 波浪</string>
+    <string name="progress_standard">标准</string>
+    <string name="progress_wave">波浪</string>
+    <string name="lyrics_fade">歌词上下渐变</string>
+    <string name="lyrics_fade_desc">歌词页上下边缘淡出效果</string>
+    <string name="player_status_bar">播放页显示状态栏</string>
+    <string name="player_status_bar_desc">关闭后进入播放页会隐藏系统状态栏</string>
+
+    <string name="delete_playlist">删除歌单</string>
+    <string name="delete_playlist_confirm">确定删除这个歌单吗？此操作不可恢复。</string>
+    <string name="delete_ok">已删除</string>
+    <string name="delete_failed">删除失败</string>
+    <string name="download_all">下载全部</string>
+    <string name="download_all_progress">正在下载 %1$d/%2$d…</string>
+    <string name="download_all_done">完成：成功 %1$d 首，失败 %2$d 首</string>
+
+    <string name="cancel">取消</string>
+    <string name="confirm">确定</string>
+    <string name="back">返回</string>
+</resources>

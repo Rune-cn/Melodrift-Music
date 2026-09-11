@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 仅对网易云 CDN 放行明文（播放地址为 http://*.music.126.net），其余保持 https-only -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false" />
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">126.net</domain>
+        <domain includeSubdomains="true">music.163.com</domain>
+    </domain-config>
+</network-security-config>
