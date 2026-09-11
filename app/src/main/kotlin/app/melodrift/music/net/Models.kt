@@ -45,9 +45,6 @@ data class Playlist(
     val subscribed: Boolean = false
 )
 
-@Immutable
-data class LyricLine(val timeMs: Long, val text: String)
-
 /** 歌单详情（含歌曲列表） */
 @Immutable
 data class PlaylistDetail(
@@ -123,27 +120,5 @@ object Json {
             creatorName = o.optJSONObject("creator")?.let { strOrNull(it, "nickname") } ?: "",
             subscribed = o.optBoolean("subscribed", false)
         )
-    }
-
-    /** 把 LRC 文本解析为时间戳行 */
-    fun parseLrc(lrc: String): List<LyricLine> {
-        val lines = mutableListOf<LyricLine>()
-        val timeRegex = Regex("""\[(\d{1,2}):(\d{1,2})(?:[.:](\d{1,3}))?]""")
-        for (raw in lrc.lines()) {
-            val line = raw.trim()
-            if (line.isEmpty()) continue
-            val matches = timeRegex.findAll(line).toList()
-            if (matches.isEmpty()) continue
-            val text = line.replace(timeRegex, "").trim()
-            if (text.isEmpty()) continue
-            for (m in matches) {
-                val min = m.groupValues[1].toInt()
-                val sec = m.groupValues[2].toInt()
-                val frac = m.groupValues[3].ifEmpty { "0" }
-                val ms = frac.padEnd(3, '0').take(3).toInt()
-                lines.add(LyricLine(min * 60_000L + sec * 1000L + ms, text))
-            }
-        }
-        return lines.sortedBy { it.timeMs }
     }
 }

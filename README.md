@@ -24,7 +24,8 @@
 歌曲 / 歌单 / 歌手三类结果；搜索历史（去重、最多 20 条、长按删除、一键清空）
 
 **播放页**
-封面页（圆角大图）与歌词页左右滑动；**双语歌词**滚动（原文 + 译文按时间对齐，无译文时只显示原文）
+封面页（圆角大图）与歌词页左右滑动；**双语歌词**滚动（原文 + 译文**一对一**配对，作词/作曲等制作信息不参与配对；
+只翻副歌的歌就只在副歌那几行显示译文）
 + 上下边缘渐变；进度条支持标准 / 波浪两种样式；迷你条上拉跟手预览、过阈值进入播放页，
 迷你条封面是**旋转唱片**（播放时转动 + 圆形进度环）。
 工具行含**音质**、**倍速**、**循环模式**（列表 / 单曲 / 随机）、**定时关闭**；
@@ -98,7 +99,7 @@ melodrift-music/
     └── src/main/
         ├── AndroidManifest.xml         # 权限 + 前台服务 + Activity
         ├── kotlin/app/melodrift/music/
-        │   ├── net/                    # NcmApi(接口) NcmCrypto(加密) Models(模型) Downloader(下载)
+        │   ├── net/                    # NcmApi(接口) NcmCrypto(加密) Models(模型) Lyrics(歌词) Downloader(下载)
         │   ├── player/                 # PlayerController(全局播放器) MusicPlaybackService(前台服务/通知)
         │   ├── data/                   # Settings + 历史/进度/收藏/搜索历史等本地存储
         │   ├── ui/                     # Compose 界面（导航、各页面、主题）

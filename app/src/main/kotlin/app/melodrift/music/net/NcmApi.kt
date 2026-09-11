@@ -331,17 +331,19 @@ object NcmApi {
         }
     }
 
-    /** 歌词（LRC 原文 + 译文） */
-    data class LyricResult(val lrc: List<LyricLine>, val translated: List<LyricLine>)
-
-    fun lyric(id: Long): LyricResult {
+    /**
+     * 歌词：原文 + 译文**已解析并一对一配对**，UI 可直接渲染（见 [Lyrics]）。
+     * 解析与配对都在这一次调用里（IO 线程）完成，不把两个原始列表丢给 UI 去拼。
+     */
+    fun lyric(id: Long): List<LyricRow> {
         val j = JSONObject(
             weapiPost("/api/song/lyric", mapOf("id" to id, "lv" to -1, "kv" to -1, "tv" to -1))
         )
         checkCode(j, "lyric")
-        val lrcText = j.optJSONObject("lrc")?.optString("lyric", "") ?: ""
-        val tlycText = j.optJSONObject("tlyric")?.optString("lyric", "") ?: ""
-        return LyricResult(Json.parseLrc(lrcText), Json.parseLrc(tlycText))
+        return Lyrics.build(
+            lrcText = j.optJSONObject("lrc")?.optString("lyric", ""),
+            translatedText = j.optJSONObject("tlyric")?.optString("lyric", "")
+        )
     }
 
     // ───────────────────────── 搜索 ─────────────────────────

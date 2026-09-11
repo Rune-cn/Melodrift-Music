@@ -24,7 +24,7 @@ import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import app.melodrift.music.data.PlaybackPositions
 import app.melodrift.music.data.PlayHistoryStore
 import app.melodrift.music.data.QueueStore
-import app.melodrift.music.net.LyricLine
+import app.melodrift.music.net.LyricRow
 import app.melodrift.music.net.NcmApi
 import app.melodrift.music.net.Song
 import kotlinx.coroutines.CoroutineScope
@@ -69,13 +69,11 @@ object PlayerController {
     var errorText by mutableStateOf<String?>(null)
         private set
 
-    /** 当前歌曲歌词（加载中为空） */
-    var lyrics by mutableStateOf<List<LyricLine>>(emptyList())
-        private set
-    var translatedLyrics by mutableStateOf<List<LyricLine>>(emptyList())
+    /** 歌词行（原文 + 已配对译文），由 NcmApi.lyric 在 IO 线程解析/配对好；切歌瞬间清空 */
+    var lyrics by mutableStateOf<List<LyricRow>>(emptyList())
         private set
 
-    /** 播放历史（最近播放，最新在前，去重，最多 20 条，内存态） */
+    /** 播放历史（最近播放，最新在前，去重，上限 50 条，与 PlayHistoryStore 一致） */
     var playHistory by mutableStateOf<List<Song>>(emptyList())
         private set
 
@@ -409,7 +407,6 @@ object PlayerController {
         // 切歌立即清空歌词：否则新歌加载期间显示的是上一首的歌词
         // （连点时即使最终会被正确覆盖，中间那段也是"歌词对不上"）
         lyrics = emptyList()
-        translatedLyrics = emptyList()
         // 队列快照落盘：重开 App 后迷你条恢复上次歌曲
         persistQueue()
 
@@ -421,8 +418,7 @@ object PlayerController {
                 null
             }
             if (currentIndex != index || current?.id != songId) return@launch
-            lyrics = r?.lrc ?: emptyList()
-            translatedLyrics = r?.translated ?: emptyList()
+            lyrics = r ?: emptyList()
         }
 
         // 播放地址（IO）→ 主线程播放

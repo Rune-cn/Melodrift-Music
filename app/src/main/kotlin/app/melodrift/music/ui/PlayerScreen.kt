@@ -104,7 +104,6 @@ import android.content.Context
 import app.melodrift.music.R
 import app.melodrift.music.data.SavedSongsCache
 import app.melodrift.music.net.Downloader
-import app.melodrift.music.net.LyricLine
 import app.melodrift.music.net.NcmApi
 import app.melodrift.music.net.Song
 import app.melodrift.music.player.LoopMode
@@ -484,52 +483,26 @@ fun VipBadge() {
     )
 }
 
-/**
- * 取原文时间点对应的译文文本：二分找最后一条 `timeMs <= t` 的译文行。
- * 译文缺失、该时刻还没到第一条译文、或译文为空串时返回 null（不占位）。
- */
-private fun translatedAt(trans: List<LyricLine>, t: Long): String? {
-    if (trans.isEmpty()) return null
-    var lo = 0
-    var hi = trans.lastIndex
-    var idx = -1
-    while (lo <= hi) {
-        val mid = (lo + hi) ushr 1
-        if (trans[mid].timeMs <= t) {
-            idx = mid
-            lo = mid + 1
-        } else {
-            hi = mid - 1
-        }
-    }
-    val text = trans.getOrNull(idx)?.text?.trim()
-    return if (text.isNullOrEmpty()) null else text
-}
-
 // ═══ 歌词页（右）═══
 
 @Composable
 private fun LyricsPage() {
-    val lines = PlayerController.lyrics
-    val trans = PlayerController.translatedLyrics
+    // 歌词行由 net/Lyrics.kt 在 IO 线程解析 + 配对完毕，UI 只负责渲染
+    val rows = PlayerController.lyrics
     val listState = rememberLazyListState()
-
-    // 双语歌词：译文按时间对齐到原文行（取该时刻正在显示的译文行，空文本不显示）。
-    // 只在歌词/译文变化时算一次，不随 positionMs 每 tick 重算。
-    val rows = remember(lines, trans) { lines.map { it to translatedAt(trans, it.timeMs) } }
 
     // 当前歌词行：用 derivedStateOf 派生 —— 只有"行号真的变了"才让本页重组，
     // 不再跟着 positionMs 每 500ms 重算一次（原来是全表线性扫 + withIndex 分配）。
     // 歌词按时间升序，故改二分查找。
-    val currentIndex by remember(lines) {
+    val currentIndex by remember(rows) {
         derivedStateOf {
             val position = PlayerController.positionMs
             var lo = 0
-            var hi = lines.lastIndex
+            var hi = rows.lastIndex
             var idx = 0
             while (lo <= hi) {
                 val mid = (lo + hi) ushr 1
-                if (lines[mid].timeMs <= position) {
+                if (rows[mid].timeMs <= position) {
                     idx = mid
                     lo = mid + 1
                 } else {
@@ -541,12 +514,12 @@ private fun LyricsPage() {
     }
 
     LaunchedEffect(currentIndex) {
-        if (lines.isNotEmpty()) {
+        if (rows.isNotEmpty()) {
             listState.animateScrollToItem((currentIndex - 3).coerceAtLeast(0))
         }
     }
 
-    if (lines.isEmpty()) {
+    if (rows.isEmpty()) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(
                 stringResource(R.string.no_lyrics),
@@ -597,7 +570,7 @@ private fun LyricsPage() {
                     .padding(vertical = 6.dp)
             ) {
                 Text(
-                    row.first.text,
+                    row.text,
                     style = MaterialTheme.typography.bodyLarge,
                     color = if (isCurrent) {
                         MaterialTheme.colorScheme.primary
@@ -607,8 +580,8 @@ private fun LyricsPage() {
                     fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
                     textAlign = TextAlign.Center
                 )
-                // 译文行：字号小一档、透明度更低，当前行也用主色但略淡，保持主次
-                val transText = row.second
+                // 译文行：字号小一档、透明度更低；当前行也用主色但略淡，保持主次
+                val transText = row.translation
                 if (transText != null) {
                     Text(
                         transText,

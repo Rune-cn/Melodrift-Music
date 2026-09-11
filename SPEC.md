@@ -40,7 +40,7 @@ ui ──────────────┐  Compose 界面，只读状态 
  ├── NcmApi（object 单例，阻塞式，必须在 IO 线程调用）
  └── data/*（SharedPreferences 存储，同步读写）
 player ──────────── ExoPlayer 封装 + 前台服务 + 通知 + MediaSession
-net ─────────────── weapi 加密请求 / 模型解析 / 下载
+net ─────────────── weapi 加密请求 / 模型解析 / 歌词解析配对(Lyrics) / 下载
 util ────────────── CrashLog
 ```
 
@@ -65,6 +65,15 @@ util ────────────── CrashLog
   重进就没歌"的回归。
 - `Models.kt`：轻量 data class + `Json` 工具（org.json，不引入序列化库）。
   **所有进 UI 的模型都标 `@Immutable`** —— 让 Compose 认作稳定参数，避免整列重组。
+- `Lyrics.kt`：**歌词解析与原文↔译文配对全部收口在这里**，`NcmApi.lyric()` 在 IO 线程一次
+  产出 `List<LyricRow>`（`timeMs / text / translation`），UI 只渲染。三条硬规则：
+  1. **禁止**"最后一条 `timeMs <= t` 的译文"这种匹配 —— 网易云常只翻副歌
+     （玫瑰少年 72 行原文 / 5 行译文），那样最后一条译文会一路漏到歌尾，后半段全是同一句。
+  2. 配对**一对一**：先按时间戳精确配对（绝大多数歌译文与原文时间戳完全相同），剩余按时间差
+     升序贪心，容差 `TOLERANCE_MS = 700`（实测偏差最大 580ms；722ms 的"制作人↔下一句"必须落在外面）。
+  3. **制作信息行**（`作词 / 作曲 / 编曲 / 制作人 / OP / SP / Lyrics / Written by…`，见 `CREDIT_KEYS`）
+     两侧都不参与配对，否则开头那几行会把真正歌词的译文抢走（Yesterday Once More 实测）。
+  解析侧还做：一行多时间戳展开、无时间戳/空文本行丢弃、`(time,text)` 去重、稳定升序。
 - `Downloader`：按音质取地址 → 写系统「下载」目录（MediaStore，低版本回落 legacy 外部存储）；
   失败抛带原因的 `IOException`；**必须在 IO 线程调用**。
   - **只有一种下载方案**：weapi `/api/song/enhance/player/url/v1` 取播放地址 → CDN 直下，
@@ -122,6 +131,9 @@ util ────────────── CrashLog
 
 ### 4.3 重组范围
 
+- **歌词只有单一状态 `PlayerController.lyrics: List<LyricRow>`**（原文 + 已配对译文），
+  配对在 net 层 IO 线程完成（见 §3 `Lyrics.kt`）；UI 侧不再有 `translatedLyrics`、
+  也不再有 `remember` 缓存的对齐函数。
 - 高频状态（`positionMs`）只喂进度条；派生值一律用 `derivedStateOf`。
   歌词当前行 = `derivedStateOf` + **二分查找**（歌词按时间升序），
   确保"只有行号变化才重组"，不得退回"每 tick 全表线性扫"。
