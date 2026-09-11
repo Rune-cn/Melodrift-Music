@@ -32,6 +32,7 @@
     <string name="quality_current">当前</string>
     <string name="download_no_url">获取播放地址失败，歌曲可能需会员或受版权限制</string>
     <string name="download_http">下载失败（网络/CDN 错误）</string>
+    <string name="download_need_permission">Android 9 及以下需要存储权限才能保存到「下载」目录</string>
     <string name="download_failed_reason">下载失败：%1$s</string>
     <string name="quality_standard">标准</string>
     <string name="quality_exhigh">较高</string>

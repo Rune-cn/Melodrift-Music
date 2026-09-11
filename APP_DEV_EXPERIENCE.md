@@ -1,7 +1,9 @@
 # Android 普通应用开发实战经验（Compose + Material 3）
 
-> 从「Example」模块的 UI 部分沉淀（2026-08）。均为真实踩坑与结论，按需取用。
-> 配套：LSP 模块专属经验见 `LSP_MODULE_EXPERIENCE.md`；工程规范见 `SPEC.md`。
+> ⚠️ **本文是通用 Android/Compose 模板（「Example」模块）的经验沉淀，不是本项目规范。**
+> 本项目（Melodrift Music）的工程规范以 [`SPEC.md`](SPEC.md) 为准；两者结论冲突时以 `SPEC.md` 为准，
+> 冲突处已在对应小节标注「本项目实际做法」。
+> 文中提到的 `LSP_MODULE_EXPERIENCE.md` 属于另一个 LSPosed 模块工程，**不在本仓库内**。
 
 ---
 
@@ -11,13 +13,14 @@
 
 ```bash
 # 构建（工程目录内；Android Studio 之外的命令行方式）
-ANDROID_HOME=/opt/android-sdk /opt/gradle-9.3.1/bin/gradle assembleRelease --no-daemon
+ANDROID_HOME=/opt/android-sdk /opt/gradle-9.6.0/bin/gradle assembleRelease --no-daemon
 
 # 验证签名
 /opt/android-sdk/build-tools/36.0.0/apksigner verify app/build/outputs/apk/release/app-release.apk
 ```
 
-- AGP 9.1.1 / Kotlin 2.4.0（compose 插件同版本）/ Compose BOM 2026.05.00
+- AGP 9.4.0 / Kotlin 2.4.10（compose 插件同版本）/ Compose BOM 2026.08.00
+- **AGP 9.4 起必须 Gradle ≥ 9.6.0**，旧版 Gradle 直接报版本不满足（9.3.x 已不可用）
 - `settings.gradle.kts`：阿里云镜像优先（google/central/gradle-plugin）+ `flatDir { dirs("libs") }` 支持本地 aar
 
 ### 1.2 aapt2 版本冲突（必踩）
@@ -57,6 +60,9 @@ val colorScheme = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
 }
 ```
 
+> 📌 **本项目不采用动态取色**：Melodrift Music 固定品牌配色（浅色背景恒 `#F0F1F3`），
+> 见 `SPEC.md` §5.3。以下结论适用于"要做动态取色"的模板工程。
+
 - Android 12+ 走 Material You；**低版本不要自己推 HSL 配色**——直接抄官方 baseline 色板
   （`baselineColorScheme`：light primary `#6750A4` / dark primary `#D0BCFF`，design token 全套手抄进 `ColorSchemes.kt`，稳定且观感统一）
 
@@ -82,6 +88,9 @@ private fun animateColorWithLerp(target: Color, spec: FiniteAnimationSpec<Float>
 ### 2.4 深色模式
 
 - 手动开关控制（`settings.darkMode`），不跟随系统——用户可控性更好
+
+> 📌 **本项目实际是三态**：`darkMode: String ∈ system / light / dark`，默认跟随系统（`SPEC.md` §5.3）。
+> 从旧的 Boolean 迁移时要用 `sp.all[key]` 判实际类型，否则 `getString` 抛 `ClassCastException`。
 
 ---
 
@@ -114,7 +123,7 @@ override fun attachBaseContext(newBase: Context) {
 }
 private fun applyLocaleContext(base: Context, lang: String): Context {
     if (lang == "system") return base
-    val locale = if (lang == "zh") Locale("zh", "CN") else Locale.ENGLISH
+    val locale = if (lang == "zh") Locale.forLanguageTag("zh-CN") else Locale.ENGLISH  // Locale("zh","CN") 已 deprecated
     val config = Configuration(base.resources.configuration).apply { setLocale(locale) }
     return base.createConfigurationContext(config)
 }
@@ -163,6 +172,11 @@ apksigner verify app-release.apk
 aapt2 dump xmltree --file AndroidManifest.xml app-release.apk
 # 资源表（混淆后查资源映射）
 aapt2 dump resources app-release.apk
-# dex 硬编码中文检查（应无 UI 文案）
-unzip -p app-release.apk classes.dex | strings | grep -P '[\x{4e00}-\x{9fff}]'
+# dex 硬编码中文检查
+# ❌ 别用 `strings | grep -P '[\x{4e00}-\x{9fff}]'`：strings 只输出可打印 ASCII，
+#    非 ASCII 序列被它吃掉，结果永远 0 命中（假阴性，给的是错误安全感）。
+# ✅ 直接对二进制按 UTF-8 匹配：
+unzip -p app-release.apk classes.dex | grep -cP '\p{Han}'
+# 注意：命中数包含依赖库自带的中文，不等于"本应用 UI 有硬编码文案"；
+#      本仓库实测 107 行命中，来源是 net/ 层异常文案与 亿/万 单位（见 SPEC.md §5.5 已知例外）。
 ```

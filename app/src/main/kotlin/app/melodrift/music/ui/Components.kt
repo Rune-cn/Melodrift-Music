@@ -1,5 +1,12 @@
 package app.melodrift.music.ui
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -571,5 +578,38 @@ fun Avatar(url: String?, modifier: Modifier = Modifier.size(40.dp)) {
             contentScale = ContentScale.Crop,
             modifier = modifier.clip(CircleShape)
         )
+    }
+}
+
+/**
+ * Android 9 及以下写公共「下载」目录需要 `WRITE_EXTERNAL_STORAGE`
+ * （API 29+ 走 MediaStore，无需该权限，直接放行）。
+ *
+ * 返回一个包装函数：已授权 / 无需授权时立即执行；否则先弹系统授权框，
+ * 用户同意后自动补跑原动作，拒绝则提示一次原因（无需重新点下载）。
+ */
+@Composable
+fun rememberStoragePermissionGuard(): (action: () -> Unit) -> Unit {
+    val ctx = LocalContext.current
+    var pending by remember { mutableStateOf<(() -> Unit)?>(null) }
+    val launcher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        val action = pending
+        pending = null
+        if (granted) action?.invoke()
+        else Toast.makeText(ctx, R.string.download_need_permission, Toast.LENGTH_SHORT).show()
+    }
+    return { action ->
+        val noPermissionNeeded = Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q
+        val granted = noPermissionNeeded || ContextCompat.checkSelfPermission(
+            ctx, Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == PackageManager.PERMISSION_GRANTED
+        if (granted) {
+            action()
+        } else {
+            pending = action
+            launcher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+        }
     }
 }

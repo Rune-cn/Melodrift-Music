@@ -11,7 +11,8 @@
 | 版本 | 1.0.2（versionCode 3） |
 | compileSdk / targetSdk / minSdk | 37 / **36（Android 16）** / 26 |
 | ABI | 仅 `arm64-v8a` |
-| 语言资源 | 仅 `zh-rCN` + `en`（`resourceConfigurations`） |
+| 语言资源 | 仅 `zh-rCN` + `en`（`resourceConfigurations`）。注意英文是**默认 `values/`**，
+  `aapt2 dump badging` 显示为 `--_--` 而非 `en`，`"en"` 一项实际不参与筛选（保留以防将来出现带前缀的 en 资源） |
 | AGP / Gradle | **9.4.0 / ≥ 9.6.0**（AGP 9.4 硬性要求，旧 Gradle 直接报错） |
 | Kotlin | 2.4.10（compose 插件同版本，Java 17） |
 | Compose BOM | 2026.08.00 |
@@ -51,7 +52,8 @@ util ────────────── CrashLog
 ## 3. 网络层规范（`net/`）
 
 - `NcmCrypto`：weapi（双层 AES-128-CBC + RSA `encSecKey`）与 eapi（AES-128-ECB）两套算法集中于此，
-  改加密只动这个文件。
+  改加密只动这个文件。**当前业务只用 weapi**；`eapiEncrypt()` 已实现但无调用点（预留给官方下载接口，
+  尚未接入），别误以为 eapi 链路已经跑通。
 - `NcmApi`：单例 `OkHttpClient`；`cookie` 由设置页注入（含 `MUSIC_U` / `__csrf`）；
   写操作（红心 / 收藏 / 建删歌单）返回 `Boolean`/`Long`，读操作返回 `Models.kt` 里的数据类。
 - **`playlistDetail` 必须保留 trackIds 兜底**：`/api/v6/playlist/detail` 对部分请求只回
@@ -62,9 +64,14 @@ util ────────────── CrashLog
   **所有进 UI 的模型都标 `@Immutable`** —— 让 Compose 认作稳定参数，避免整列重组。
 - `Downloader`：按音质取地址 → 写系统「下载」目录（MediaStore，低版本回落 legacy 外部存储）；
   失败抛带原因的 `IOException`；**必须在 IO 线程调用**。
-  - **两种下载方案**（设置「下载方式」）：`local` 复用播放地址（weapi songUrl，可智能降级）；
-    `official` 走官方客户端下载接口（eapi `/api/song/enhance/download/url/v1`，需 VIP 下载权益，
-    无批量接口 → 批量下载逐首取）。方案开关在 `Downloader.official`，由 MainActivity 启动/变更时写入。
+  - **只有一种下载方案**：weapi `/api/song/enhance/player/url/v1` 取播放地址 → CDN 直下，
+    音质拿不到时 `songUrlSmart` 智能降级。官方客户端下载接口（eapi
+    `/api/song/enhance/download/url/v1`）**未实现**，也没有「下载方式」设置项，别照着旧文档加开关。
+  - **落盘位置**：`Download/MelodriftMusic`（API 29+ 走 MediaStore；API 26–28 走 legacy 公共目录，
+    需要 `WRITE_EXTERNAL_STORAGE`，Manifest 已限 `maxSdkVersion="28"`，由 `DownloadQualityDialog`
+    里的 `rememberStoragePermissionGuard()` 请求，授权后自动续跑下载；未授权或被拒绝时回落应用专属外部目录）。
+  - **批量下载整个歌单**：`songUrls()` 一次批量取址（避免逐首请求被限流）+ 串行下载 +
+    单首失败延时 300ms 重试一次；入口在歌单详情页菜单，与单曲共用同一个音质选择对话框。
   - **下载必须跑在 `Downloader.taskScope`**（独立 SupervisorJob），不得用页面/对话框的
     `rememberCoroutineScope` —— 对话框 dismiss、页面退出都会取消那个 scope，
     下载实际完成却因 CancellationException 被当失败（"提示失败但文件已下载"就是这个坑）。
@@ -116,7 +123,8 @@ util ────────────── CrashLog
 ### 5.1 导航
 
 - 自实现返回栈：`private sealed interface Screen`（Home / Search / Library / Settings /
-  Playlist / SongList / Player）+ `var stack: List<Screen>`，`push` 去重、`pop` 回退。
+  Playlist / SongList / Player）+ `var stack: List<Screen>`；`push` 只挡**栈顶**重复
+  （`if (stack.last() != s)`，不是全栈去重），`pop` 出栈。
 - 底栏两个 tab（首页 / 收藏）；播放页是**覆盖层**而非普通页面：
   迷你条上拉 → 预览态跟手升起，过阈值才 `push`；下滑 → 跟手收起，过阈值才关闭。
 - 系统返回键：预览中先取消预览，其次出栈；**设置子页面优先退回设置主页**
@@ -152,8 +160,13 @@ util ────────────── CrashLog
 
 ### 5.5 资源与文案
 
-- 全部文案进 `values/strings.xml`（en）+ `values-zh-rCN/strings.xml`（zh），**key 与中英一一对应**；
-  代码里一律 `stringResource()`，禁止硬编码中文。
+- 全部文案进 `values/strings.xml`（en）+ `values-zh-rCN/strings.xml`（zh），**key 与中英一一对应**
+  （当前各 192 条，可用 `diff <(grep -o 'name="…"' values/strings.xml|sort) <(… values-zh-rCN/…|sort)` 校验）；
+  ui 层一律 `stringResource()`，不得新增硬编码文案。
+- **已知例外（待办，见 §8）**：`net/` 层异常文案与兜底名仍是中文字面量
+  （`"未登录：cookie 中缺少有效的 MUSIC_U"`、`"每日推荐为空（可能未登录）"`、`"歌单不存在"`、
+  `"未知歌曲/未知歌单/陌生人"`），会经 `e.message` 进 `ErrorBox`/Toast；
+  `Components.formatCount()` 的 `"%.1f亿"/"%.1f万"` 在英文界面也显示中文单位。
 - 语言切换：`attachBaseContext` 挂载 locale + `CompositionLocalProvider(LocalContext provides ...)`
   即时生效，**不 recreate Activity**；locale 构造用 `Locale.forLanguageTag("zh-CN")`
   （`Locale("zh","CN")` 已 deprecated）。
@@ -185,6 +198,10 @@ util ────────────── CrashLog
 - [ ] `aapt2 dump resources` 确认 `zh-rCN` 配置仍在、其他语言已剥离
 - [ ] 三态深色模式（含跟随系统随设备切换）、中英切换、首次启动协议弹窗各验一遍
 - [ ] 播放页：状态栏开关、进度 seek、倍速、定时、循环、音质切换、下载
+- [ ] 双语歌词：有译文的歌显示原文 + 译文两行且随当前行高亮；无译文歌只剩原文；
+      「歌词上下渐变」开关对整块（含译文）生效
+- [ ] Android 9 及以下：首次下载弹存储权限 → 同意后自动续跑下载、文件出现在 `Download/MelodriftMusic`；
+      拒绝时给出一次明确提示而不是静默失败
 - [ ] 后台播放 + 通知控制 + 耳机线控；断网 / 切歌 / 播放完毕不崩溃
 - [ ] 大歌单滚动无掉帧、队列拖拽排序后条目状态不错位
 - [ ] 源码分发：移除 `*.keystore`、`local.properties`、`build/`、`.gradle/`、`.kotlin/`，
@@ -202,3 +219,5 @@ util ────────────── CrashLog
 4. **okhttp 5.x / Coil 3.x**：分别受 media3 依赖与包名迁移阻塞，需单独排期。
 5. **KRC 逐字歌词** Canvas 渲染（尚未实现）。
 6. 零散清理：`TabRow` → `PrimaryTabRow`；`LocalClipboardManager` → `LocalClipboard`（API 变 suspend）。
+7. **`net/` 层文案资源化**：异常原因与兜底名改 key（或错误码 + ui 层映射），
+   `formatCount()` 的 `亿/万` 改按当前 locale 走 `CompactNumberFormatter` 或本地化模板。

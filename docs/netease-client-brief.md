@@ -1,5 +1,11 @@
 # 网易云音乐第三方客户端 · 新会话任务书
 
+> ⚠️ **历史设计文档（2026-08 立项任务书）**，保留作决策留痕。
+> 与最终实现的差异以 [`../SPEC.md`](../SPEC.md) 为准：例如"外观动态取色"实际改为**固定品牌色**、
+> 计划的 `api/crypto/WeapiCrypto.kt + EapiCrypto.kt` 实际合并为 `net/NcmCrypto.kt`、
+> 目录前缀 `api/` 实际为 `net/`。文中引用的 `/workspace/netease/*`、`API_REFERENCE.md`
+> 是仓库外的逆向资产，**不在本仓库内**。
+
 > 给新建会话 AI 的开场说明。已有逆向成果全部就绪，无需重新逆向。
 > 技术栈已定：**Kotlin + Jetpack Compose（Android）**，外观**动态取色**，设置**分组分类**，
 > 支持**中英双语**，不做检查更新。

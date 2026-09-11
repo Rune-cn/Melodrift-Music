@@ -32,6 +32,7 @@
     <string name="quality_current">Current</string>
     <string name="download_no_url">Cannot fetch playable URL — song may require VIP or be copyright-restricted</string>
     <string name="download_http">Download failed (HTTP error)</string>
+    <string name="download_need_permission">Storage permission is required to save downloads on Android 9 or below</string>
     <string name="download_failed_reason">Download failed: %1$s</string>
     <string name="quality_standard">Standard</string>
     <string name="quality_exhigh">High</string>

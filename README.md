@@ -13,18 +13,22 @@
 ## 功能
 
 **首页**
-每日推荐 · 推荐歌单 · 排行榜（飙升/新歌/原创/热歌）· 播放历史（本地持久化，点击续播）
+每日推荐 · 推荐歌单 · 排行榜（飙升/新歌/原创/热歌）· 播放历史（本地持久化，最多 50 条；
+开启设置「恢复播放位置」后点击可从断点续播）
 
 **收藏**
-我喜欢的音乐 · 收藏的歌单 · 创建的歌单（支持新建 / 删除 / 批量管理曲目）
+我喜欢的音乐 · 收藏的歌单 · 创建的歌单（收藏页新建，歌单详情页删除）
+「收藏到歌单」支持一次勾选多个歌单批量增删同一首歌
 
 **搜索**
 歌曲 / 歌单 / 歌手三类结果；搜索历史（去重、最多 20 条、长按删除、一键清空）
 
 **播放页**
-封面页与歌词页左右滑动；旋转唱片；双语歌词滚动 + 边缘渐变；进度条支持标准 / 波浪两种样式；
-迷你条上拉跟手预览、过阈值进入播放页。工具行含**音质**、**倍速**、**循环模式**（列表 / 单曲 / 随机）、
-**定时关闭**；支持下载当前歌曲（按所选音质存入系统「下载」目录）。
+封面页（圆角大图）与歌词页左右滑动；**双语歌词**滚动（原文 + 译文按时间对齐，无译文时只显示原文）
++ 上下边缘渐变；进度条支持标准 / 波浪两种样式；迷你条上拉跟手预览、过阈值进入播放页，
+迷你条封面是**旋转唱片**（播放时转动 + 圆形进度环）。
+工具行含**音质**、**倍速**、**循环模式**（列表 / 单曲 / 随机）、**定时关闭**；
+支持下载当前歌曲到 `Download/MelodriftMusic`（Android 9 及以下首次下载会请求存储权限）。
 
 **后台与控制**
 前台服务（`mediaPlayback`）+ 通知栏 MediaStyle 控制 + `MediaSessionCompat`（耳机线控 / 系统媒体控制）。
@@ -41,8 +45,8 @@
 ## 构建
 
 ```bash
-cd /workspace/melodrift-music
-ANDROID_HOME=/opt/android-sdk /opt/gradle-9.6.0/bin/gradle assembleRelease --no-daemon
+cd <项目目录>
+ANDROID_HOME=/path/to/android-sdk /path/to/gradle-9.6.0/bin/gradle assembleRelease --no-daemon
 ```
 
 产物：`app/build/outputs/apk/release/app-release.apk`（R8 混淆 + 资源收缩 + 签名，约 2.2 MB）。
@@ -87,7 +91,7 @@ melodrift-music/
 ├── docs/                               # 设计任务书 + 播放器技术定案
 ├── settings.gradle.kts                 # 阿里云镜像仓库 + flatDir(libs)
 ├── build.gradle.kts                    # AGP / Kotlin compose 插件版本
-├── gradle.properties                   # JVM 参数 / aapt2 覆盖 / 签名密码
+├── gradle.properties                   # JVM 参数 / aapt2 覆盖 / 签名密码（分发时移除）
 └── app/
     ├── build.gradle.kts                # 编译配置、依赖、签名
     ├── proguard-rules.pro
@@ -111,7 +115,9 @@ melodrift-music/
 ## 已知限制
 
 - 仅 arm64-v8a（不含 x86 / armeabi-v7a，模拟器需 arm64 镜像）
-- 逐字歌词（KRC）未实现，当前为普通 YRC/文本歌词
+- 逐字歌词（KRC）未实现，当前为普通 YRC/文本歌词（原文 + 译文两行）
+- 不支持从歌单批量移除曲目（`manipulateTracks` 目前只用于「收藏到歌单」的单首多歌增删）
+- `NcmCrypto` 里的 eapi 加密已实现但暂无业务调用（下载走 weapi 播放地址）
 - 媒体会话仍基于 `androidx.media` 的 `MediaSessionCompat`（该库 1.8.0 起整体标记废弃），
   迁移到 `androidx.media3.session` 是待办项，详见 `SPEC.md`「技术债」
 

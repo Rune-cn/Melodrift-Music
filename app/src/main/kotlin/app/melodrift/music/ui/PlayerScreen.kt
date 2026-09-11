@@ -100,9 +100,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import android.content.Context
 import app.melodrift.music.R
 import app.melodrift.music.data.SavedSongsCache
 import app.melodrift.music.net.Downloader
+import app.melodrift.music.net.LyricLine
 import app.melodrift.music.net.NcmApi
 import app.melodrift.music.net.Song
 import app.melodrift.music.player.LoopMode
@@ -389,6 +391,8 @@ internal fun DownloadQualityDialog(
     onDownload: ((String) -> Unit)? = null
 ) {
     val ctx = LocalContext.current
+    // Android 9 及以下写公共下载目录需要存储权限（API 29+ 走 MediaStore 免权限）
+    val withStorage = rememberStoragePermissionGuard()
 
     AlertDialog(
         onDismissRequest = onDismiss,
@@ -414,37 +418,11 @@ internal fun DownloadQualityDialog(
                             .fillMaxWidth()
                             .clickable {
                                 onDismiss()
-                                if (onDownload != null) {
-                                    onDownload(level)
-                                } else {
-                                    // 用下载专用协程域而不是对话框的 rememberCoroutineScope：
-                                    // onDismiss 会移除对话框并取消其 scope，下载其实在 IO 上
-                                    // 跑完了，但 CancellationException 会被当成失败 ——
-                                    // 出现"提示下载失败，文件却已保存"的假失败
-                                    Downloader.taskScope.launch {
-                                        Toast.makeText(ctx, R.string.downloading, Toast.LENGTH_SHORT).show()
-                                        var okPath: String? = null
-                                        var failMsg: String? = null
-                                        try {
-                                            okPath = withContext(Dispatchers.IO) {
-                                                Downloader.downloadSong(ctx, song, level)
-                                            }
-                                        } catch (e: Exception) {
-                                            failMsg = e.message
-                                        }
-                                        if (okPath != null) {
-                                            Toast.makeText(ctx, R.string.downloaded, Toast.LENGTH_SHORT).show()
-                                        } else {
-                                            val msg = when {
-                                                failMsg == "no_url" -> ctx.getString(R.string.download_no_url)
-                                                failMsg != null && failMsg.startsWith("http:") ->
-                                                    ctx.getString(R.string.download_http)
-                                                failMsg != null ->
-                                                    ctx.getString(R.string.download_failed_reason, failMsg)
-                                                else -> ctx.getString(R.string.download_failed)
-                                            }
-                                            Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
-                                        }
+                                withStorage {
+                                    if (onDownload != null) {
+                                        onDownload(level)
+                                    } else {
+                                        downloadSingleSong(ctx, song, level)
                                     }
                                 }
                             }
@@ -457,6 +435,37 @@ internal fun DownloadQualityDialog(
             TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
         }
     )
+}
+
+/**
+ * 单曲下载（下载音质对话框确认后调用）。
+ *
+ * 用 [Downloader.taskScope] 而不是对话框的 rememberCoroutineScope：
+ * onDismiss 会移除对话框并取消其 scope，下载其实在 IO 上跑完了，
+ * 但 CancellationException 会被当成失败 —— 出现"提示下载失败，文件却已保存"的假失败。
+ */
+internal fun downloadSingleSong(ctx: Context, song: Song, level: String) {
+    Downloader.taskScope.launch {
+        Toast.makeText(ctx, R.string.downloading, Toast.LENGTH_SHORT).show()
+        var okPath: String? = null
+        var failMsg: String? = null
+        try {
+            okPath = withContext(Dispatchers.IO) { Downloader.downloadSong(ctx, song, level) }
+        } catch (e: Exception) {
+            failMsg = e.message
+        }
+        if (okPath != null) {
+            Toast.makeText(ctx, R.string.downloaded, Toast.LENGTH_SHORT).show()
+        } else {
+            val msg = when {
+                failMsg == "no_url" -> ctx.getString(R.string.download_no_url)
+                failMsg != null && failMsg.startsWith("http:") -> ctx.getString(R.string.download_http)
+                failMsg != null -> ctx.getString(R.string.download_failed_reason, failMsg)
+                else -> ctx.getString(R.string.download_failed)
+            }
+            Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
+        }
+    }
 }
 
 @Composable
@@ -475,12 +484,39 @@ fun VipBadge() {
     )
 }
 
+/**
+ * 取原文时间点对应的译文文本：二分找最后一条 `timeMs <= t` 的译文行。
+ * 译文缺失、该时刻还没到第一条译文、或译文为空串时返回 null（不占位）。
+ */
+private fun translatedAt(trans: List<LyricLine>, t: Long): String? {
+    if (trans.isEmpty()) return null
+    var lo = 0
+    var hi = trans.lastIndex
+    var idx = -1
+    while (lo <= hi) {
+        val mid = (lo + hi) ushr 1
+        if (trans[mid].timeMs <= t) {
+            idx = mid
+            lo = mid + 1
+        } else {
+            hi = mid - 1
+        }
+    }
+    val text = trans.getOrNull(idx)?.text?.trim()
+    return if (text.isNullOrEmpty()) null else text
+}
+
 // ═══ 歌词页（右）═══
 
 @Composable
 private fun LyricsPage() {
     val lines = PlayerController.lyrics
+    val trans = PlayerController.translatedLyrics
     val listState = rememberLazyListState()
+
+    // 双语歌词：译文按时间对齐到原文行（取该时刻正在显示的译文行，空文本不显示）。
+    // 只在歌词/译文变化时算一次，不随 positionMs 每 tick 重算。
+    val rows = remember(lines, trans) { lines.map { it to translatedAt(trans, it.timeMs) } }
 
     // 当前歌词行：用 derivedStateOf 派生 —— 只有"行号真的变了"才让本页重组，
     // 不再跟着 positionMs 每 500ms 重算一次（原来是全表线性扫 + withIndex 分配）。
@@ -536,18 +572,10 @@ private fun LyricsPage() {
             .padding(horizontal = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        itemsIndexed(lines) { index, line ->
+        itemsIndexed(rows) { index, row ->
             val isCurrent = index == currentIndex
-            Text(
-                line.text,
-                style = MaterialTheme.typography.bodyLarge,
-                color = if (isCurrent) {
-                    MaterialTheme.colorScheme.primary
-                } else {
-                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
-                },
-                fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-                textAlign = TextAlign.Center,
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
                     .fillMaxWidth()
                     .graphicsLayer {
@@ -567,7 +595,34 @@ private fun LyricsPage() {
                         }
                     }
                     .padding(vertical = 6.dp)
-            )
+            ) {
+                Text(
+                    row.first.text,
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = if (isCurrent) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                    },
+                    fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
+                    textAlign = TextAlign.Center
+                )
+                // 译文行：字号小一档、透明度更低，当前行也用主色但略淡，保持主次
+                val transText = row.second
+                if (transText != null) {
+                    Text(
+                        transText,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isCurrent) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.85f)
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.40f)
+                        },
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
+                }
+            }
         }
         item { Spacer(Modifier.height(24.dp)) }
     }
@@ -770,7 +825,7 @@ private fun WaveTrackProgress(
             val omega = (2f * Math.PI.toFloat()) / 48.dp.toPx() // 波长约 48dp
             val endX = (progress * size.width).coerceIn(0f, size.width)
 
-            fun waveY(x: Float): Float = midY + amp * kotlin.math.sin(x * omega + phaseVal).toFloat()
+            fun waveY(x: Float): Float = midY + amp * kotlin.math.sin(x * omega + phaseVal)
 
             // 未播段（endX → width）：浅色
             val tail = Path().apply {
