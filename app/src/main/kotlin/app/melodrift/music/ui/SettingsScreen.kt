@@ -2,13 +2,18 @@ package app.melodrift.music.ui
 
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -34,12 +39,14 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Switch
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -55,6 +62,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.colorResource
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -65,17 +73,23 @@ import app.melodrift.music.BuildConfig
 import app.melodrift.music.R
 import app.melodrift.music.util.CrashLog
 import app.melodrift.music.data.SettingsData
+import app.melodrift.music.data.mergeBackup
+import app.melodrift.music.data.toBackupJson
 import app.melodrift.music.net.NcmApi
 import app.melodrift.music.player.QUALITY_LEVELS
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 /** 设置板块（点击卡片进入的子页面） */
 private enum class SettingsSection(val titleRes: Int) {
     ACCOUNT(R.string.account),
     PLAYBACK(R.string.settings_playback),
     APPEARANCE(R.string.appearance),
+    DATA(R.string.settings_data),
     ABOUT(R.string.about)
 }
 
@@ -86,24 +100,39 @@ private enum class SettingsSection(val titleRes: Int) {
 @Composable
 fun SettingsScreen(
     settings: SettingsData,
-    onChange: (SettingsData) -> Unit
+    onChange: (SettingsData) -> Unit,
+    onBack: () -> Unit
 ) {
     val ctx = LocalContext.current
     var section by remember { mutableStateOf<SettingsSection?>(null) }
     // 子页面时：系统返回键先回到设置主页，而不是退出设置
     BackHandler(enabled = section != null) { section = null }
 
-    // 主页 ⇄ 子页面：缩放 + 淡入淡出过渡
+    // 主页 ⇄ 子页面：带方向的推进 / 回退过渡。
+    // 原来只有缩放（0.94→1 / 1→0.97），两级页面之间没有方向信息，看不出"进了子页"；
+    // 改成子页面从右侧推进、主页同时向左退场，返回时反向，位移只有屏宽 1/5 ~ 1/3，
+    // 不会像整页平移那样喧宾夺主。
     AnimatedContent(
         targetState = section,
         transitionSpec = {
-            (scaleIn(initialScale = 0.94f, animationSpec = tween(240)) + fadeIn(tween(240))) togetherWith
-                (scaleOut(targetScale = 0.97f, animationSpec = tween(160)) + fadeOut(tween(160)))
+            val enteringSub = targetState != null
+            val enter = slideInHorizontally(tween(280, easing = FastOutSlowInEasing)) {
+                if (enteringSub) it / 3 else -it / 5
+            } + fadeIn(tween(200))
+            val exit = slideOutHorizontally(tween(240, easing = LinearOutSlowInEasing)) {
+                if (enteringSub) -it / 5 else it / 3
+            } + fadeOut(tween(200))
+            enter togetherWith exit
         },
         label = "settings"
     ) { current ->
         if (current == null) {
-            SettingsMainPage(settings = settings, onChange = onChange, onOpen = { section = it })
+            SettingsMainPage(
+                settings = settings,
+                onChange = onChange,
+                onOpen = { section = it },
+                onBack = onBack
+            )
         } else {
             SettingsSectionPage(
                 section = current,
@@ -121,23 +150,36 @@ fun SettingsScreen(
 private fun SettingsMainPage(
     settings: SettingsData,
     onChange: (SettingsData) -> Unit,
-    onOpen: (SettingsSection) -> Unit
+    onOpen: (SettingsSection) -> Unit,
+    onBack: () -> Unit
 ) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-    ) {
-        Text(
-            stringResource(R.string.nav_settings),
-            style = MaterialTheme.typography.headlineLarge,
-            modifier = Modifier.padding(bottom = 12.dp)
-        )
+    Column(modifier = Modifier.fillMaxSize()) {
+        // 顶栏固定在滚动区之外：设置项变多往下滚时，返回按钮不会跟着滚走
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
+            }
+            Text(
+                stringResource(R.string.nav_settings),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = dimensionResource(R.dimen.page_padding))
+        ) {
         // 设置板块卡片（无分隔线，行距更开阔）
         Card(
             modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(dimensionResource(R.dimen.card_radius)),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
             )
@@ -166,11 +208,17 @@ private fun SettingsMainPage(
                 onClick = { onOpen(SettingsSection.APPEARANCE) }
             )
             SectionEntryRow(
+                title = stringResource(R.string.settings_data),
+                onClick = { onOpen(SettingsSection.DATA) }
+            )
+            SectionEntryRow(
                 title = stringResource(R.string.about),
+                showDivider = false,
                 onClick = { onOpen(SettingsSection.ABOUT) }
             )
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(dimensionResource(R.dimen.space_xl)))
+        }
     }
 }
 
@@ -179,15 +227,17 @@ private fun SettingsMainPage(
 private fun SectionEntryRow(
     title: String,
     trailing: @Composable () -> Unit = {},
+    showDivider: Boolean = true,
     onClick: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 22.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onClick)
+                .padding(horizontal = 20.dp, vertical = 22.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
         Text(
             title,
             style = MaterialTheme.typography.titleMedium,
@@ -201,6 +251,15 @@ private fun SectionEntryRow(
             contentDescription = null,
             tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        }
+        // 主页卡内行间分隔线（最后一行 showDivider=false）
+        if (showDivider) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = 20.dp),
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+        }
     }
 }
 
@@ -222,17 +281,12 @@ private fun SettingsSectionPage(
     var showMiniBarDialog by remember { mutableStateOf(false) }
     var showProgressDialog by remember { mutableStateOf(false) }
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp)
-    ) {
-        // 子页面顶部栏：返回 + 标题
+    Column(modifier = Modifier.fillMaxSize()) {
+        // 顶部栏固定在滚动区之外（与设置主页一致）
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 8.dp),
+                .padding(start = 8.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(onClick = onBack) {
@@ -244,7 +298,12 @@ private fun SettingsSectionPage(
                 fontWeight = FontWeight.SemiBold
             )
         }
-
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = dimensionResource(R.dimen.page_padding))
+        ) {
         when (section) {
             SettingsSection.ACCOUNT -> {
                 SettingsCard {
@@ -263,6 +322,7 @@ private fun SettingsSectionPage(
                         },
                         onClick = { showCookieDialog = true }
                     )
+                    AccountTestRow(cookie = settings.cookie)
                 }
             }
             SettingsSection.PLAYBACK -> {
@@ -326,6 +386,7 @@ private fun SettingsSectionPage(
                     )
                     SettingsRow(
                         title = stringResource(R.string.player_status_bar),
+                        showDivider = false,
                         trailing = {
                             Switch(
                                 checked = settings.playerStatusBar,
@@ -391,11 +452,112 @@ private fun SettingsSectionPage(
                     )
                     SettingsRow(
                         title = stringResource(R.string.lyrics_fade),
+                        showDivider = false,
                         trailing = {
                             Switch(
                                 checked = settings.lyricsFade,
                                 onCheckedChange = { onChange(settings.copy(lyricsFade = it)) }
                             )
+                        }
+                    )
+                }
+            }
+            SettingsSection.DATA -> {
+                var pendingImport by remember { mutableStateOf<String?>(null) }
+                var importFailed by remember { mutableStateOf(false) }
+                val exportLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.CreateDocument("application/json")
+                ) { uri ->
+                    if (uri == null) return@rememberLauncherForActivityResult
+                    val ok = try {
+                        ctx.contentResolver.openOutputStream(uri)?.use {
+                            it.write(settings.toBackupJson().toByteArray())
+                        } != null
+                    } catch (_: Exception) {
+                        false
+                    }
+                    Toast.makeText(
+                        ctx,
+                        if (ok) R.string.export_ok else R.string.export_failed,
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+                val importLauncher = rememberLauncherForActivityResult(
+                    ActivityResultContracts.OpenDocument()
+                ) { uri ->
+                    if (uri == null) return@rememberLauncherForActivityResult
+                    val text = try {
+                        ctx.contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() }
+                    } catch (_: Exception) {
+                        null
+                    }
+                    if (text == null || settings.mergeBackup(text) == null) {
+                        importFailed = true
+                    } else {
+                        pendingImport = text
+                    }
+                }
+                SettingsCard {
+                    SettingsRow(
+                        title = stringResource(R.string.export_settings),
+                        onClick = {
+                            exportLauncher.launch(
+                                // 注意：模式串里不能有裸字母（melodrift 里的 'e' 会被当成格式字符），
+                                // 字面量必须加单引号；文件名前缀放到外面拼
+                                "melodrift-settings-" +
+                                    SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(Date()) +
+                                    ".json"
+                            )
+                        }
+                    )
+                    SettingsRow(
+                        title = stringResource(R.string.import_settings),
+                        showDivider = false,
+                        onClick = {
+                            importFailed = false
+                            importLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+                        }
+                    )
+                }
+                Spacer(Modifier.height(dimensionResource(R.dimen.card_gap)))
+                Text(
+                    stringResource(R.string.data_backup_note),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = dimensionResource(R.dimen.space_s))
+                )
+                if (importFailed) {
+                    Spacer(Modifier.height(dimensionResource(R.dimen.space_s)))
+                    Text(
+                        stringResource(R.string.import_invalid),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        modifier = Modifier.padding(horizontal = dimensionResource(R.dimen.space_s))
+                    )
+                }
+                pendingImport?.let { json ->
+                    AlertDialog(
+                        onDismissRequest = { pendingImport = null },
+                        title = { Text(stringResource(R.string.import_settings)) },
+                        text = { Text(stringResource(R.string.import_confirm)) },
+                        confirmButton = {
+                            TextButton(onClick = {
+                                val merged = settings.mergeBackup(json)
+                                if (merged != null) {
+                                    onChange(merged)
+                                    Toast.makeText(
+                                        ctx, R.string.import_ok, Toast.LENGTH_SHORT
+                                    ).show()
+                                } else {
+                                    importFailed = true
+                                }
+                                pendingImport = null
+                            }) { Text(stringResource(R.string.confirm)) }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { pendingImport = null }) {
+                                Text(stringResource(R.string.cancel))
+                            }
                         }
                     )
                 }
@@ -414,10 +576,10 @@ private fun SettingsSectionPage(
                         painter = painterResource(R.drawable.ic_app_logo),
                         contentDescription = stringResource(R.string.app_name),
                         modifier = Modifier
-                            .size(88.dp)
-                            .clip(RoundedCornerShape(22.dp))
+                            .size(dimensionResource(R.dimen.about_logo))
+                            .clip(RoundedCornerShape(dimensionResource(R.dimen.about_logo_radius)))
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(dimensionResource(R.dimen.space_m)))
                     Text(
                         stringResource(R.string.app_name),
                         style = MaterialTheme.typography.titleMedium,
@@ -464,6 +626,7 @@ private fun SettingsSectionPage(
                     )
                     SettingsRow(
                         title = stringResource(R.string.crash_log),
+                        showDivider = false,
                         onClick = {
                             crashLogText = CrashLog.read(ctx)
                             if (crashLogText == null) {
@@ -482,7 +645,8 @@ private fun SettingsSectionPage(
                 }
             }
         }
-        Spacer(Modifier.height(24.dp))
+        Spacer(Modifier.height(dimensionResource(R.dimen.space_xl)))
+    }
     }
 
     if (showCookieDialog) {
@@ -557,39 +721,39 @@ private fun SettingsSectionPage(
     }
 }
 
-/** 播放器底部迷你条样式弹窗 */
 @Composable
 private fun MiniBarStyleDialog(current: String, onSelected: (String) -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.minibar_style)) },
-        text = {
-            Column {
-                RadioRow(stringResource(R.string.minibar_rounded), current != "square") { onSelected("rounded") }
-                RadioRow(stringResource(R.string.minibar_square), current == "square") { onSelected("square") }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
+    SelectionDialog(
+        title = stringResource(R.string.minibar_style),
+        options = listOf(
+            SelectionOption("rounded", stringResource(R.string.minibar_rounded)),
+            SelectionOption("square", stringResource(R.string.minibar_square))
+        ),
+        selectedKey = current,
+        onSelected = onSelected,
+        onDismiss = onDismiss
     )
 }
 
-/** 进度条样式弹窗 */
 @Composable
 private fun ProgressStyleDialog(current: String, onSelected: (String) -> Unit, onDismiss: () -> Unit) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.progress_style)) },
-        text = {
-            Column {
-                RadioRow(stringResource(R.string.progress_standard), current != "wave") { onSelected("standard") }
-                RadioRow(stringResource(R.string.progress_wave), current == "wave") { onSelected("wave") }
-            }
-        },
-        confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } }
+    SelectionDialog(
+        title = stringResource(R.string.progress_style),
+        options = listOf(
+            SelectionOption("standard", stringResource(R.string.progress_standard)),
+            SelectionOption("wave", stringResource(R.string.progress_wave))
+        ),
+        selectedKey = current,
+        onSelected = onSelected,
+        onDismiss = onDismiss
     )
 }
 
 /** Cookie 弹窗：输入 → 测试连接 → 保存 */
+/**
+ * Cookie 输入弹窗（保持朴素：输入 + 保存）。
+ * 连接测试不在这里做，已移到「设置 → 账户」的一行，只给成功 / 失败两种结果。
+ */
 @Composable
 private fun CookieDialog(
     current: String,
@@ -602,19 +766,15 @@ private fun CookieDialog(
         onDismissRequest = onDismiss,
         title = { Text(stringResource(R.string.cookie)) },
         text = {
-            Column {
-                OutlinedTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    modifier = Modifier.fillMaxWidth(),
-                    placeholder = { Text(stringResource(R.string.cookie_placeholder)) },
-                    minLines = 4,
-                    maxLines = 8,
-                    shape = RoundedCornerShape(12.dp)
-                )
-                Spacer(Modifier.height(8.dp))
-                TestConnectionRow(cookie = text)
-            }
+            OutlinedTextField(
+                value = text,
+                onValueChange = { text = it },
+                modifier = Modifier.fillMaxWidth(),
+                placeholder = { Text(stringResource(R.string.cookie_placeholder)) },
+                minLines = 4,
+                maxLines = 8,
+                shape = RoundedCornerShape(dimensionResource(R.dimen.space_m))
+            )
         },
         confirmButton = {
             TextButton(onClick = { onSave(text.trim()) }) {
@@ -622,96 +782,71 @@ private fun CookieDialog(
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
+    )
+}
+
+/** 账户页的「测试连接」行：只给成功 / 失败两种结果（不显示昵称与错误详情） */
+@Composable
+private fun AccountTestRow(cookie: String) {
+    val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var testing by remember { mutableStateOf(false) }
+    var ok by remember { mutableStateOf<Boolean?>(null) }
+
+    SettingsRow(
+        title = stringResource(R.string.test_connection),
+        showDivider = false,
+        trailing = {
+            when {
+                testing -> CircularProgressIndicator(
+                    modifier = Modifier.size(18.dp), strokeWidth = 2.dp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                ok != null -> Text(
+                    stringResource(if (ok == true) R.string.test_ok else R.string.test_failed),
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = if (ok == true) colorResource(R.color.success_green)
+                    else MaterialTheme.colorScheme.error
+                )
+            }
+        },
+        onClick = {
+            if (cookie.isBlank()) {
+                Toast.makeText(ctx, R.string.cookie_empty, Toast.LENGTH_SHORT).show()
+            } else if (!testing) {
+                testing = true
+                ok = null
+                scope.launch {
+                    val r = try {
+                        withContext(Dispatchers.IO) { NcmApi.account(); true }
+                    } catch (_: Exception) {
+                        false
+                    }
+                    ok = r
+                    testing = false
+                }
             }
         }
     )
 }
 
-/** Cookie 测试连接行：成功后显示账号昵称 */
-@Composable
-private fun TestConnectionRow(cookie: String) {
-    val scope = rememberCoroutineScope()
-    val ctx = LocalContext.current
-    var testing by remember { mutableStateOf(false) }
-    var result by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
-    val emptyMsg = stringResource(R.string.cookie_empty)
-    val okTemplate = stringResource(R.string.cookie_ok)
-    val errTemplate = stringResource(R.string.cookie_error)
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Button(
-            onClick = {
-                if (cookie.isBlank()) {
-                    Toast.makeText(ctx, emptyMsg, Toast.LENGTH_SHORT).show()
-                    return@Button
-                }
-                testing = true
-                result = null
-                scope.launch {
-                    NcmApi.cookie = cookie.trim()
-                    val r = try {
-                        val acc = withContext(Dispatchers.IO) { NcmApi.account() }
-                        Pair(true, String.format(okTemplate, acc.nickname))
-                    } catch (e: Exception) {
-                        Pair(false, String.format(errTemplate, e.message ?: ""))
-                    }
-                    testing = false
-                    result = r
-                }
-            },
-            enabled = !testing
-        ) {
-            if (testing) {
-                CircularProgressIndicator(
-                    modifier = Modifier.size(16.dp),
-                    strokeWidth = 2.dp,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
-                Spacer(Modifier.width(8.dp))
-                Text(stringResource(R.string.cookie_testing))
-            } else {
-                Text(stringResource(R.string.cookie_test))
-            }
-        }
-        Spacer(Modifier.width(12.dp))
-        val r = result
-        if (r != null) {
-            Icon(
-                if (r.first) Icons.Filled.Check else Icons.Filled.ErrorOutline,
-                contentDescription = null,
-                tint = if (r.first) colorResource(R.color.success_green)
-                else MaterialTheme.colorScheme.error,
-                modifier = Modifier.width(20.dp).height(20.dp)
-            )
-            Spacer(Modifier.width(6.dp))
-            Text(
-                r.second,
-                style = MaterialTheme.typography.bodySmall,
-                color = if (r.first) colorResource(R.color.success_green)
-                else MaterialTheme.colorScheme.error,
-                modifier = Modifier.weight(1f)
-            )
-        }
-    }
-}
-
 // ─── 通用设置组件 ─────────────────────────────
+
 
 @Composable
 private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(dimensionResource(R.dimen.card_radius)),
         colors = CardDefaults.cardColors(
+            // 中性灰卡（surfaceContainerHighest 已显式定义，避免 M3 紫灰）+ 1dp 阴影：
+            // 与参考项目一致的"浮卡"观感，卡内 1dp 分隔线（outlineVariant）可见
             containerColor = MaterialTheme.colorScheme.surfaceContainerHighest
-        )
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Column(content = content)
     }
@@ -721,25 +856,39 @@ private fun SettingsCard(content: @Composable ColumnScope.() -> Unit) {
 private fun SettingsRow(
     title: String,
     enabled: Boolean = true,
+    showDivider: Boolean = true,
     trailing: @Composable () -> Unit = {},
     onClick: () -> Unit = {}
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            title,
-            style = MaterialTheme.typography.bodyLarge,
-            color = if (enabled) Color.Unspecified
-            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
-            modifier = Modifier.weight(1f)
-        )
-        Spacer(Modifier.width(12.dp))
-        trailing()
+    Column(Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = enabled, onClick = onClick)
+                .padding(
+                    horizontal = dimensionResource(R.dimen.row_padding_h),
+                    vertical = dimensionResource(R.dimen.row_padding_v)
+                ),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                title,
+                style = MaterialTheme.typography.bodyLarge,
+                color = if (enabled) Color.Unspecified
+                else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.38f),
+                modifier = Modifier.weight(1f)
+            )
+            Spacer(Modifier.width(12.dp))
+            trailing()
+        }
+        // 行间分隔线：与卡片等宽（两侧缩进行内边距），每组最后一行 showDivider=false
+        if (showDivider) {
+            HorizontalDivider(
+                modifier = Modifier.padding(horizontal = dimensionResource(R.dimen.row_padding_h)),
+                thickness = 1.dp,
+                color = MaterialTheme.colorScheme.outlineVariant
+            )
+        }
     }
 }
 
@@ -750,76 +899,35 @@ private fun languageLabel(lang: String): String = when (lang) {
     else -> stringResource(R.string.language_system)
 }
 
-/** 单选行（供 Quality / Crossfade / Language 复用） */
-@Composable
-private fun RadioRow(label: String, selected: Boolean, onSelect: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onSelect)
-            .padding(vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(selected = selected, onClick = onSelect)
-        Spacer(Modifier.width(8.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-    }
-}
-
 @Composable
 private fun QualityDialog(
     current: String,
     onSelected: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.default_quality)) },
-        text = {
-            Column {
-                QUALITY_LEVELS.forEach { level ->
-                    RadioRow(
-                        label = qualityLabel(level),
-                        selected = current == level,
-                        onSelect = { onSelected(level) }
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
+    SelectionDialog(
+        title = stringResource(R.string.default_quality),
+        options = QUALITY_LEVELS.map { SelectionOption(it, qualityLabel(it)) },
+        selectedKey = current,
+        onSelected = onSelected,
+        onDismiss = onDismiss
     )
 }
 
-/** 淡入淡出时长弹窗：单一时长，新歌渐强与旧歌减弱共用（1~8 秒） */
 @Composable
 private fun CrossfadeDialog(
     current: Int,
     onSelected: (Int) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.crossfade_duration)) },
-        text = {
-            Column(Modifier.verticalScroll(rememberScrollState())) {
-                (1..8).forEach { sec ->
-                    RadioRow(
-                        label = stringResource(R.string.seconds_format, sec),
-                        selected = current == sec,
-                        onSelect = { onSelected(sec) }
-                    )
-                }
-            }
+    SelectionDialog(
+        title = stringResource(R.string.crossfade_duration),
+        options = (1..8).map {
+            SelectionOption(it.toString(), stringResource(R.string.seconds_format, it))
         },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
+        selectedKey = current.toString(),
+        onSelected = { onSelected(it.toInt()) },
+        onDismiss = onDismiss
     )
 }
 
@@ -829,36 +937,16 @@ private fun LanguageDialog(
     onSelected: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.language)) },
-        text = {
-            Column {
-                LanguageRow(
-                    value = "system",
-                    label = stringResource(R.string.language_system),
-                    selected = current,
-                    onSelect = { onSelected("system") }
-                )
-                LanguageRow(
-                    value = "zh",
-                    label = stringResource(R.string.language_zh),
-                    selected = current,
-                    onSelect = { onSelected("zh") }
-                )
-                LanguageRow(
-                    value = "en",
-                    label = stringResource(R.string.language_en),
-                    selected = current,
-                    onSelect = { onSelected("en") }
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
+    SelectionDialog(
+        title = stringResource(R.string.language),
+        options = listOf(
+            SelectionOption("system", stringResource(R.string.language_system)),
+            SelectionOption("zh", "简体中文"),
+            SelectionOption("en", "English")
+        ),
+        selectedKey = current,
+        onSelected = onSelected,
+        onDismiss = onDismiss
     )
 }
 
@@ -870,56 +958,23 @@ private fun darkModeLabel(mode: String): String = when (mode) {
     else -> stringResource(R.string.dark_mode_system)
 }
 
-/** 深色模式弹窗：跟随系统 / 浅色 / 深色 */
 @Composable
 private fun DarkModeDialog(
     current: String,
     onSelected: (String) -> Unit,
     onDismiss: () -> Unit
 ) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.dark_mode)) },
-        text = {
-            Column {
-                RadioRow(
-                    label = stringResource(R.string.dark_mode_system),
-                    selected = current == "system",
-                    onSelect = { onSelected("system") }
-                )
-                RadioRow(
-                    label = stringResource(R.string.dark_mode_light),
-                    selected = current == "light",
-                    onSelect = { onSelected("light") }
-                )
-                RadioRow(
-                    label = stringResource(R.string.dark_mode_dark),
-                    selected = current == "dark",
-                    onSelect = { onSelected("dark") }
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.cancel))
-            }
-        }
+    SelectionDialog(
+        title = stringResource(R.string.dark_mode),
+        options = listOf(
+            SelectionOption("system", stringResource(R.string.dark_mode_system)),
+            SelectionOption("light", stringResource(R.string.dark_mode_light)),
+            SelectionOption("dark", stringResource(R.string.dark_mode_dark))
+        ),
+        selectedKey = current,
+        onSelected = onSelected,
+        onDismiss = onDismiss
     )
-}
-
-@Composable
-private fun LanguageRow(value: String, label: String, selected: String, onSelect: () -> Unit) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onSelect)
-            .padding(vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(selected = selected == value, onClick = onSelect)
-        Spacer(Modifier.width(8.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge)
-    }
 }
 
 /** 崩溃日志查看弹窗：显示堆栈 + 一键复制 */

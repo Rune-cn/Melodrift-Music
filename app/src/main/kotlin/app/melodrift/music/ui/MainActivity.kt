@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.view.View
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
@@ -212,7 +213,14 @@ class MainActivity : ComponentActivity() {
             val localizedContext = remember(settings.language) {
                 applyLocaleContext(systemBase ?: this@MainActivity, settings.language)
             }
-            CompositionLocalProvider(LocalContext provides localizedContext) {
+            CompositionLocalProvider(
+                LocalContext provides localizedContext,
+                // localizedContext 是 createConfigurationContext 的产物，不是 Activity；
+                // rememberLauncherForActivityResult 只认 LocalActivityResultRegistryOwner，
+                // 不显式提供就抛 "No ActivityResultRegistryOwner was provided"
+                // —— 这就是点进「设置 → 数据」闪退的原因（Android 9 下载授权弹窗同理）。
+                LocalActivityResultRegistryOwner provides this@MainActivity
+            ) {
                 MelodriftMusicTheme(settings = settings) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
@@ -443,7 +451,11 @@ private fun MelodriftApp(
                         onPlaySongs = onPlaySongs,
                         onOpenPlaylist = { id, name -> push(Screen.Playlist(id, name)) }
                     )
-                    is Screen.Settings -> SettingsScreen(settings = settings, onChange = onSettingsChange)
+                    is Screen.Settings -> SettingsScreen(
+                        settings = settings,
+                        onChange = onSettingsChange,
+                        onBack = { pop() }
+                    )
                     is Screen.Library -> LibraryScreen(
                         cookie = settings.cookie,
                         onOpenPlaylist = { id, name -> push(Screen.Playlist(id, name)) },
@@ -503,13 +515,8 @@ private fun MiniPlayerBar(
     onPreviewingChange: (Boolean) -> Unit = {}
 ) {
     val song = PlayerController.current
-    // 上拉进入阈值：offsetY < threshold 即放行进入。offsetY 从屏高跟手减小，
-    // 所以该比值越大 = 越早放行 = 轻拉即进入；这里取屏高 80%，
-    // 即只需上拉约 20% 屏高就进入播放页（手感偏灵敏）
-    val thresholdPx = screenHeightPx * 0.8f
     // 是否正在上拉（预览播放页，未正式进入）
     var draggingUp by remember { mutableStateOf(false) }
-
     // 样式：方形 / 圆角
     val shape = if (style == "square") RoundedCornerShape(0.dp) else RoundedCornerShape(18.dp)
     // 圆角悬浮、方形贴底
@@ -522,35 +529,56 @@ private fun MiniPlayerBar(
         modifier = Modifier
             .fillMaxWidth()
             .padding(horizontal = if (style == "square") 0.dp else 10.dp, vertical = pad)
-            // 点击打开播放页（与上拉手势分离，互不干扰）
-            .clickable(enabled = active && song != null, onClick = onOpenPlayer)
             // iOS 式上拉：播放页只做"预览式"跟手升起——不进页面栈；
-            // 松手过阈值才真正进入，不足则回弹并停留在当前页面
+            // 松手过阈值（或快速上扫）才真正进入，不足则回弹并停留在当前页面。
+            //
+            // 三处修复"有时候上拉进不去"：
+            // ① pointerInput 必须排在 clickable **之前**：修饰符链里靠前的先拿到事件，
+            //    原来 clickable 在前，小幅拖拽会被它当成点击吃掉；
+            // ② 位移改为累加**手势自身的增量**（dragAccum），不再读 playerOffsetY.value
+            //    —— 原来每个事件都 scope.launch { snapTo(value + dy) }，读到的常是上一帧的旧值、
+            //    并发 launch 还会乱序，松手时 offsetY 可能远落后于手指，于是判"没拉够"而回弹；
+            // ③ 阈值从"屏高 20%"降到 80dp，并加**速度判定**：快速轻扫即使位移不够也放行。
             .pointerInput(active, song?.id) {
                 if (!active || song == null) return@pointerInput
+                val dragRequiredPx = 80.dp.toPx()
+                val flingUpPxPerSec = (-900).dp.toPx()
+                var dragAccum = 0f
+                // 本版本 detectVerticalDragGestures 的 onDragEnd 不给速度，
+                // 所以自己按最后两次事件估算瞬时速度（向上为负 px/s）
+                var lastEventNanos = 0L
+                var upSpeedPxPerSec = 0f
                 detectVerticalDragGestures(
                     onDragStart = {
                         draggingUp = true
+                        dragAccum = 0f
+                        upSpeedPxPerSec = 0f
+                        lastEventNanos = System.nanoTime()
                         // 播放页覆盖层先沉底，跟随手指升起（仅预览，不 push）
                         scope.launch { playerOffsetY.snapTo(screenHeightPx) }
                         onPreviewingChange(true)
                     },
                     onVerticalDrag = { change, dragAmount ->
-                        if (draggingUp) {
-                            change.consume()
-                            scope.launch {
-                                playerOffsetY.snapTo(
-                                    (playerOffsetY.value + dragAmount).coerceIn(0f, screenHeightPx)
-                                )
-                            }
+                        if (!draggingUp) return@detectVerticalDragGestures
+                        change.consume()
+                        dragAccum += dragAmount
+                        val now = System.nanoTime()
+                        val dt = (now - lastEventNanos) / 1_000_000_000f
+                        if (dt > 0.0001f) {
+                            upSpeedPxPerSec = dragAmount / dt
+                            lastEventNanos = now
                         }
+                        val target = (screenHeightPx - dragAccum).coerceIn(0f, screenHeightPx)
+                        scope.launch { playerOffsetY.snapTo(target) }
                     },
                     onDragEnd = {
                         if (draggingUp) {
                             draggingUp = false
-                            if (playerOffsetY.value < thresholdPx) {
-                                // 拉得够高：立即确认进入（push 同步生效 → 迷你条/底栏马上开始落下），
-                                // 播放页归位动画与 push 并行播放，不阻塞
+                            val enoughDistance = dragAccum >= dragRequiredPx
+                            val flingUp = upSpeedPxPerSec < flingUpPxPerSec
+                            if (enoughDistance || flingUp) {
+                                // 到位：立即确认进入（push 同步生效 → 迷你条/底栏马上开始落下），
+                                // 播放页归位动画与 push 并行，不阻塞
                                 onPreviewingChange(false)
                                 onCommitPreview()
                                 scope.launch {
@@ -563,7 +591,7 @@ private fun MiniPlayerBar(
                                     )
                                 }
                             } else {
-                                // 拉得不够 → 回弹复位，始终停留在当前页面
+                                // 距离与速度都不够 → 回弹复位，停留在当前页面
                                 scope.launch {
                                     playerOffsetY.animateTo(screenHeightPx, tween(160))
                                     onPreviewingChange(false)
@@ -574,6 +602,8 @@ private fun MiniPlayerBar(
                     onDragCancel = {
                         if (draggingUp) {
                             draggingUp = false
+                            dragAccum = 0f
+                            upSpeedPxPerSec = 0f
                             scope.launch {
                                 playerOffsetY.animateTo(screenHeightPx, tween(160))
                                 onPreviewingChange(false)
@@ -582,6 +612,8 @@ private fun MiniPlayerBar(
                     }
                 )
             }
+            // 点击打开播放页：放在 pointerInput **之后**，让上拉手势先拿到事件
+            .clickable(enabled = active && song != null, onClick = onOpenPlayer)
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),

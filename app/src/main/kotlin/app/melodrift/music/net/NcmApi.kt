@@ -346,6 +346,166 @@ object NcmApi {
         )
     }
 
+    // ───────────────────────── 评论 ─────────────────────────
+
+    /** 歌曲评论的会话 id */
+    private fun songThread(songId: Long) = "R_SO_4_$songId"
+
+    /**
+     * 评论分页。**三个排序是三个不同接口**（实测结论）：
+     *
+     * - 推荐 `/api/comment/resource/comments/get` -> `data.comments`，翻页靠 `offset`；
+     *   该接口的 `pageNo` / `orderType` 都被服务端忽略（实测 1/2/3 返回完全相同），
+     *   `hasMore` 也不可信（16 万评论的歌返回 false）-> 只能按「本页满页」判断还有下一页。
+     * - 最热 `/api/v1/resource/hotcomments/R_SO_4_x` -> 顶层 `hotComments`，`offset` 翻页，`hasMore` 可信。
+     * - 最新 `/api/v1/resource/comments/R_SO_4_x` -> 顶层 `comments`，`offset` 翻页，`more` 可信。
+     */
+    fun comments(
+        songId: Long,
+        offset: Int = 0,
+        limit: Int = 20,
+        sort: CommentSort = CommentSort.RECOMMEND
+    ): CommentPage {
+        val thread = songThread(songId)
+        return when (sort) {
+            CommentSort.RECOMMEND -> {
+                val j = JSONObject(
+                    weapiPost(
+                        "/api/comment/resource/comments/get",
+                        mapOf(
+                            "rid" to thread,
+                            "threadId" to thread,
+                            "pageSize" to limit,
+                            "cursor" to -1,
+                            "offset" to offset,
+                            "orderType" to 1
+                        )
+                    )
+                )
+                checkCode(j, "comments")
+                val d = j.optJSONObject("data") ?: return CommentPage(0, emptyList(), false)
+                val list = Json.parseComments(d.optJSONArray("comments"))
+                CommentPage(total = d.optInt("totalCount", 0), comments = list, hasMore = list.size >= limit)
+            }
+
+            CommentSort.HOT -> {
+                val j = JSONObject(
+                    weapiPost(
+                        "/api/v1/resource/hotcomments/" + thread,
+                        mapOf("rid" to songId, "limit" to limit, "offset" to offset, "beforeTime" to 0)
+                    )
+                )
+                checkCode(j, "hotComments")
+                val list = Json.parseComments(j.optJSONArray("hotComments"))
+                CommentPage(
+                    total = j.optInt("total", 0),
+                    comments = list,
+                    hasMore = j.optBoolean("hasMore", list.size >= limit)
+                )
+            }
+
+            CommentSort.LATEST -> {
+                val j = JSONObject(
+                    weapiPost(
+                        "/api/v1/resource/comments/" + thread,
+                        mapOf("rid" to songId, "limit" to limit, "offset" to offset, "beforeTime" to 0)
+                    )
+                )
+                checkCode(j, "latestComments")
+                val list = Json.parseComments(j.optJSONArray("comments"))
+                CommentPage(
+                    total = j.optInt("total", 0),
+                    comments = list,
+                    hasMore = j.optBoolean("more", list.size >= limit)
+                )
+            }
+        }
+    }
+
+    /**
+     * 一条评论的追评（楼中楼）。翻页用返回的 [FloorPage.nextTime] 作 `time` 游标，
+     * 首次传 -1。
+     */
+    fun commentFloors(
+        songId: Long,
+        parentCommentId: Long,
+        time: Long = -1L,
+        limit: Int = 10
+    ): FloorPage {
+        val j = JSONObject(
+            weapiPost(
+                "/api/resource/comment/floor/get",
+                mapOf(
+                    "parentCommentId" to parentCommentId,
+                    "threadId" to songThread(songId),
+                    "time" to time,
+                    "limit" to limit
+                )
+            )
+        )
+        checkCode(j, "commentFloors")
+        val d = j.optJSONObject("data") ?: return FloorPage(0, emptyList(), false, -1L)
+        return FloorPage(
+            total = d.optInt("totalCount", 0),
+            comments = Json.parseComments(d.optJSONArray("comments")),
+            hasMore = d.optBoolean("hasMore", false),
+            nextTime = d.optLong("time", -1L)
+        )
+    }
+
+    /** 点赞 / 取消点赞评论 */
+    fun commentLike(songId: Long, commentId: Long, like: Boolean): Boolean {
+        val j = JSONObject(
+            weapiPost(
+                "/api/v1/comment/" + if (like) "like" else "unlike",
+                mapOf("threadId" to songThread(songId), "commentId" to commentId)
+            )
+        )
+        return j.optInt("code", -1) == 200
+    }
+
+    /**
+     * 发表评论 / 追评（回复某条评论）。
+     *
+     * 实测**空 `checkToken` 也能成功**（网易易盾只对高风险账号弹窗），
+     * 所以这里不接风控 SDK；未登录会被服务端拒（返回非 200）。
+     */
+    fun addComment(songId: Long, content: String): Boolean {
+        val text = content.trim()
+        if (text.isEmpty()) return false
+        val j = JSONObject(
+            weapiPost(
+                "/api/resource/comments/add",
+                mapOf(
+                    "threadId" to songThread(songId),
+                    "content" to text,
+                    "checkToken" to "",
+                    "code" to "0"
+                )
+            )
+        )
+        return j.optInt("code", -1) == 200
+    }
+
+    /** 追评：回复某条评论 */
+    fun replyComment(songId: Long, commentId: Long, content: String): Boolean {
+        val text = content.trim()
+        if (text.isEmpty()) return false
+        val j = JSONObject(
+            weapiPost(
+                "/api/resource/comments/reply",
+                mapOf(
+                    "threadId" to songThread(songId),
+                    "commentId" to commentId,
+                    "content" to text,
+                    "checkToken" to "",
+                    "code" to "0"
+                )
+            )
+        )
+        return j.optInt("code", -1) == 200
+    }
+
     // ───────────────────────── 搜索 ─────────────────────────
 
     /** 综合搜索；type: 1歌曲 100歌手 1000歌单 */

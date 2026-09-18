@@ -54,6 +54,9 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.Chat
+import androidx.compose.material.icons.filled.Download
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Shuffle
@@ -95,6 +98,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -172,6 +176,7 @@ private fun CoverPage(song: Song) {
     var showDetail by remember { mutableStateOf(false) }
     var showDownload by remember { mutableStateOf(false) }
     var showAddToPlaylist by remember { mutableStateOf(false) }
+    var showComments by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
     val ctx = LocalContext.current
     val clipboard = LocalClipboardManager.current
@@ -274,10 +279,35 @@ private fun CoverPage(song: Song) {
                 }
                 DropdownMenu(expanded = showMore, onDismissRequest = { showMore = false }) {
                     DropdownMenuItem(
+                        leadingIcon = {
+                            Icon(
+                                Icons.Filled.Chat,
+                                contentDescription = null,
+                                modifier = Modifier.size(dimensionResource(R.dimen.menu_icon))
+                            )
+                        },
+                        text = { Text(stringResource(R.string.comments)) },
+                        onClick = { showMore = false; showComments = true }
+                    )
+                    DropdownMenuItem(
+                        leadingIcon = {
+                            Icon(
+                                Icons.Filled.Download,
+                                contentDescription = null,
+                                modifier = Modifier.size(dimensionResource(R.dimen.menu_icon))
+                            )
+                        },
                         text = { Text(stringResource(R.string.download)) },
                         onClick = { showMore = false; showDownload = true }
                     )
                     DropdownMenuItem(
+                        leadingIcon = {
+                            Icon(
+                                Icons.Filled.Info,
+                                contentDescription = null,
+                                modifier = Modifier.size(dimensionResource(R.dimen.menu_icon))
+                            )
+                        },
                         text = { Text(stringResource(R.string.detail)) },
                         onClick = { showMore = false; showDetail = true }
                     )
@@ -301,7 +331,7 @@ private fun CoverPage(song: Song) {
                         modifier = Modifier.size(96.dp),
                         cornerRadius = 12
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(dimensionResource(R.dimen.space_m)))
                     Text(
                         song.name,
                         style = MaterialTheme.typography.titleMedium,
@@ -323,9 +353,9 @@ private fun CoverPage(song: Song) {
                         maxLines = 2,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Spacer(Modifier.height(12.dp))
+                    Spacer(Modifier.height(dimensionResource(R.dimen.space_m)))
                     HorizontalDivider()
-                    Spacer(Modifier.height(8.dp))
+                    Spacer(Modifier.height(dimensionResource(R.dimen.space_s)))
                     DetailRow(stringResource(R.string.detail_album), song.album?.name ?: "-")
                     DetailRow(stringResource(R.string.detail_duration), formatDuration(song.durationMs))
                     DetailRow(
@@ -355,7 +385,18 @@ private fun CoverPage(song: Song) {
     }
 
     if (showDownload) {
-        DownloadQualityDialog(song = song, onDismiss = { showDownload = false })
+        // 下载授权守卫必须在**对话框之外**的组合里创建（AlertDialog 是独立窗口组合，
+        // 拿不到 LocalActivityResultRegistryOwner）；Android 9 及以下会先弹授权、同意后自动续跑
+        val withStorage = rememberStoragePermissionGuard()
+        DownloadQualityDialog(
+            song = song,
+            onDismiss = { showDownload = false },
+            onDownload = { level -> withStorage { downloadSingleSong(ctx, song, level) } }
+        )
+    }
+
+    if (showComments) {
+        CommentSheet(song = song, onDismiss = { showComments = false })
     }
 }
 
@@ -381,7 +422,7 @@ private fun DetailRow(label: String, value: String) {
     }
 }
 
-/** 下载音质选择对话框：选档位后按该音质下载 */
+/** 下载音质选择对话框：档位单选（复用统一选择弹窗），选完按该音质下载 */
 @Composable
 internal fun DownloadQualityDialog(
     song: Song,
@@ -390,51 +431,29 @@ internal fun DownloadQualityDialog(
     onDownload: ((String) -> Unit)? = null
 ) {
     val ctx = LocalContext.current
-    // Android 9 及以下写公共下载目录需要存储权限（API 29+ 走 MediaStore 免权限）
-    val withStorage = rememberStoragePermissionGuard()
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.download)) },
-        text = {
-            Column {
-                Text(
-                    stringResource(R.string.download_quality_tip),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Spacer(Modifier.height(4.dp))
-                QUALITY_LEVELS.forEach { level ->
-                    val label = qualityLabel(level)
-                    val isCurrent = level == PlayerController.qualityLevel
-                    Text(
-                        if (isCurrent) "$label · ${stringResource(R.string.quality_current)}" else label,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (isCurrent) MaterialTheme.colorScheme.primary
-                        else MaterialTheme.colorScheme.onSurface,
-                        fontWeight = if (isCurrent) FontWeight.SemiBold else FontWeight.Normal,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                onDismiss()
-                                withStorage {
-                                    if (onDownload != null) {
-                                        onDownload(level)
-                                    } else {
-                                        downloadSingleSong(ctx, song, level)
-                                    }
-                                }
-                            }
-                            .padding(vertical = 12.dp)
-                    )
-                }
-            }
+    val current = PlayerController.qualityLevel
+    SelectionDialog(
+        title = stringResource(R.string.download),
+        options = QUALITY_LEVELS.map {
+            SelectionOption(
+                key = it,
+                label = qualityLabel(it),
+                subtitle = if (it == current) stringResource(R.string.quality_current) else null
+            )
         },
-        confirmButton = {
-            TextButton(onClick = onDismiss) { Text(stringResource(R.string.close)) }
-        }
+        selectedKey = current,
+        onSelected = { level ->
+            if (onDownload != null) {
+                onDownload(level)
+            } else {
+                downloadSingleSong(ctx, song, level)
+            }
+            onDismiss()
+        },
+        onDismiss = onDismiss
     )
 }
+
 
 /**
  * 单曲下载（下载音质对话框确认后调用）。
@@ -597,7 +616,7 @@ private fun LyricsPage() {
                 }
             }
         }
-        item { Spacer(Modifier.height(24.dp)) }
+        item { Spacer(Modifier.height(dimensionResource(R.dimen.space_xl))) }
     }
 }
 
@@ -1124,8 +1143,8 @@ private fun ErrorRow() {
                 Text(stringResource(R.string.retry))
             }
         }
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(dimensionResource(R.dimen.space_s)))
     } else {
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.height(dimensionResource(R.dimen.space_m)))
     }
 }

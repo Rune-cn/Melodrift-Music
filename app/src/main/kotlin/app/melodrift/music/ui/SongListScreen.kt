@@ -49,6 +49,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -140,6 +141,8 @@ private fun PlaylistBody(
     var showDownloadDialog by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var downloadBusy by remember { mutableStateOf(false) }
+    // 下载授权守卫在组合里创建（Android 9 及以下先授权后自动续跑）；传入对话框的 lambda 里不能再 remember
+    val withStorage = rememberStoragePermissionGuard()
 
     LaunchedEffect(detail.id) {
         myName = try {
@@ -258,7 +261,7 @@ private fun PlaylistBody(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(16.dp),
+                        .padding(dimensionResource(R.dimen.page_padding)),
                     verticalAlignment = Alignment.Top
                 ) {
                     CoverImage(
@@ -425,7 +428,7 @@ private fun PlaylistBody(
                     )
                 }
             }
-            item { Spacer(Modifier.height(16.dp)) }
+            item { Spacer(Modifier.height(dimensionResource(R.dimen.space_l))) }
         }
 
         val picker = pickerSong
@@ -446,7 +449,7 @@ private fun PlaylistBody(
                     onDismiss = { showDownloadDialog = false },
                     onDownload = { level ->
                         showDownloadDialog = false
-                        downloadAll(level)
+                        withStorage { downloadAll(level) }
                     }
                 )
             }
@@ -541,7 +544,7 @@ private fun SongsBody(
                 onAddToPlaylist = { pickerSong = song }
             )
         }
-        item { Spacer(Modifier.height(16.dp)) }
+        item { Spacer(Modifier.height(dimensionResource(R.dimen.space_l))) }
     }
 
     val picker = pickerSong

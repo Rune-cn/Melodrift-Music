@@ -2,6 +2,7 @@ package app.melodrift.music.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import org.json.JSONObject
 
 /**
  * 应用设置数据模型。
@@ -98,3 +99,54 @@ private fun readDarkMode(sp: SharedPreferences): String =
         is Boolean -> if (stored) "dark" else "light"
         else -> "system"
     }
+
+// ═══════════════════ 设置备份（导出 / 导入，不含 Cookie）═══════════════════
+
+/** 备份格式版本，字段增删时递增，导入侧据此做兼容 */
+private const val SETTINGS_BACKUP_VERSION = 1
+
+/**
+ * 导出为 JSON。**刻意不含 [SettingsData.cookie]**（那是登录凭证，不该跟着备份文件到处跑），
+ * 也不含「数据」这类非偏好项。
+ */
+fun SettingsData.toBackupJson(): String = JSONObject()
+    .put("app", "Melodrift Music")
+    .put("backupVersion", SETTINGS_BACKUP_VERSION)
+    .put("darkMode", darkMode)
+    .put("language", language)
+    .put("defaultQuality", defaultQuality)
+    .put("crossfadeEnabled", crossfadeEnabled)
+    .put("crossfadeSeconds", crossfadeSeconds)
+    .put("allowMixedAudio", allowMixedAudio)
+    .put("resumePlaybackPosition", resumePlaybackPosition)
+    .put("miniBarStyle", miniBarStyle)
+    .put("progressStyle", progressStyle)
+    .put("lyricsFade", lyricsFade)
+    .put("playerStatusBar", playerStatusBar)
+    .toString(2)
+
+/**
+ * 从备份 JSON 生成新设置：**保留当前 cookie 不动**，其余字段整体覆盖。
+ * 不是本 app 的备份（缺 app 标记）时返回 null，调用方据此提示"文件格式不对"。
+ * 缺失字段沿用当前值，方便旧版本备份向前兼容。
+ */
+fun SettingsData.mergeBackup(json: String): SettingsData? {
+    val o = try { JSONObject(json) } catch (_: Exception) { return null }
+    if (o.optString("app") != "Melodrift Music") return null
+    fun str(key: String, cur: String) = if (o.has(key)) o.optString(key, cur) else cur
+    fun bool(key: String, cur: Boolean) = if (o.has(key)) o.optBoolean(key, cur) else cur
+    fun int(key: String, cur: Int) = if (o.has(key)) o.optInt(key, cur) else cur
+    return copy(
+        darkMode = str("darkMode", darkMode),
+        language = str("language", language),
+        defaultQuality = str("defaultQuality", defaultQuality),
+        crossfadeEnabled = bool("crossfadeEnabled", crossfadeEnabled),
+        crossfadeSeconds = int("crossfadeSeconds", crossfadeSeconds),
+        allowMixedAudio = bool("allowMixedAudio", allowMixedAudio),
+        resumePlaybackPosition = bool("resumePlaybackPosition", resumePlaybackPosition),
+        miniBarStyle = str("miniBarStyle", miniBarStyle),
+        progressStyle = str("progressStyle", progressStyle),
+        lyricsFade = bool("lyricsFade", lyricsFade),
+        playerStatusBar = bool("playerStatusBar", playerStatusBar)
+    )
+}

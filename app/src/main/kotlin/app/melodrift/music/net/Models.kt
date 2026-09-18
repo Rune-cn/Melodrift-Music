@@ -1,6 +1,7 @@
 package app.melodrift.music.net
 
 import androidx.compose.runtime.Immutable
+import org.json.JSONArray
 import org.json.JSONObject
 
 /** 轻量数据模型（org.json 解析，避免额外序列化依赖） */
@@ -43,6 +44,50 @@ data class Playlist(
     val trackCount: Int = 0,
     val creatorName: String = "",
     val subscribed: Boolean = false
+)
+
+/**
+ * 歌曲评论（网易云 `/api/comment/resource/comments/get`）。
+ *
+ * 字段全部来自服务端 JSON，解析收口在 [Json.parseComments]；这一层不碰 Android /
+ * Compose API，换 UI 框架（Flutter 移植）时可照字段表直接平移。
+ */
+@Immutable
+data class Comment(
+    val id: Long,
+    val threadId: String,
+    val userId: Long,
+    val nickname: String,
+    val avatarUrl: String?,
+    val content: String,
+    val timeMs: Long,
+    val likedCount: Int,
+    val liked: Boolean,
+    val ipLocation: String,
+    /** 追评（楼中楼）条数：>0 才显示「查看 N 条追评」 */
+    val replyCount: Int = 0,
+    /** 本人发布 */
+    val owner: Boolean = false
+)
+
+/** 评论排序：推荐（服务端算法）/ 最热（按点赞）/ 最新（按时间） */
+enum class CommentSort { RECOMMEND, HOT, LATEST }
+
+/** 一页评论（三个排序各走各的接口，见 NcmApi.comments） */
+@Immutable
+data class CommentPage(
+    val total: Int,
+    val comments: List<Comment>,
+    val hasMore: Boolean
+)
+
+/** 一条评论的追评分页；`nextTime` 是下一页游标（服务端 data.time） */
+@Immutable
+data class FloorPage(
+    val total: Int,
+    val comments: List<Comment>,
+    val hasMore: Boolean,
+    val nextTime: Long
 )
 
 /** 歌单详情（含歌曲列表） */
@@ -104,6 +149,39 @@ object Json {
             picUrl = strOrNull(o, "picUrl"),
             fee = fee
         )
+    }
+
+    /**
+     * 解析评论数组（评论列表 / 热评 / 追评共用同一套字段）。
+     * content 缺失或为空的占位条目直接丢掉。
+     */
+    fun parseComments(arr: JSONArray?): List<Comment> {
+        if (arr == null) return emptyList()
+        val out = ArrayList<Comment>(arr.length())
+        for (k in 0 until arr.length()) {
+            val o = arr.optJSONObject(k) ?: continue
+            val content = o.optString("content", "").trim()
+            if (content.isEmpty()) continue
+            val u = o.optJSONObject("user")
+            out.add(
+                Comment(
+                    id = o.optLong("commentId", 0L),
+                    threadId = o.optString("threadId", ""),
+                    userId = u?.optLong("userId", 0L) ?: 0L,
+                    nickname = u?.optString("nickname", "").orEmpty().trim(),
+                    avatarUrl = u?.let { strOrNull(it, "avatarUrl") },
+                    content = content,
+                    timeMs = o.optLong("time", 0L),
+                    likedCount = o.optInt("likedCount", 0),
+                    liked = o.optBoolean("liked", false),
+                    ipLocation = o.optJSONObject("ipLocation")?.optString("location", "")
+                        .orEmpty().trim(),
+                    replyCount = o.optInt("replyCount", 0),
+                    owner = o.optBoolean("owner", false)
+                )
+            )
+        }
+        return out
     }
 
     fun parsePlaylist(o: JSONObject): Playlist {

@@ -42,6 +42,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -103,7 +104,9 @@ fun HomeScreen(
                 }
                 dailyLoading = false
                 if (songs.isNotEmpty()) {
-                    onOpenSongList("${account?.nickname ?: ""} · $dailyTitle", songs)
+                    // 未登录或昵称缺失时不要拼出"· 每日推荐"这种带头分隔符的标题
+                    val nick = account?.nickname?.trim().orEmpty()
+                    onOpenSongList(if (nick.isEmpty()) dailyTitle else "$nick · $dailyTitle", songs)
                 }
             }
         }
@@ -112,7 +115,7 @@ fun HomeScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = dimensionResource(R.dimen.page_padding))
     ) {
         // 问候
         item {
@@ -166,9 +169,9 @@ fun HomeScreen(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(vertical = 8.dp)
+                    .padding(vertical = dimensionResource(R.dimen.space_s))
                     .clickable(onClick = openDaily),
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(dimensionResource(R.dimen.card_radius)),
                 colors = CardDefaults.cardColors(
                     containerColor = MaterialTheme.colorScheme.primaryContainer
                 )
@@ -264,7 +267,7 @@ fun HomeScreen(
             }
         }
 
-        item { Spacer(Modifier.height(12.dp)) }
+        item { Spacer(Modifier.height(dimensionResource(R.dimen.space_m))) }
     }
 }
 

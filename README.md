@@ -3,10 +3,11 @@
 网易云音乐第三方 Android 客户端。**Jetpack Compose + Material 3**，登录走网页版 Cookie，
 接口为网易云 web 端（weapi 加密），播放基于 **androidx.media3 ExoPlayer**。
 
-- 包名 `app.melodrift.music` · 当前版本 **1.0.3**（versionCode 4）
+- 包名 `app.melodrift.music` · 当前版本 **1.0.4**（versionCode 5）
 - `minSdk 26` / `targetSdk 36`（Android 16）/ `compileSdk 37`，仅打包 **arm64-v8a**
 - 界面语言：中 / 英（应用内即时切换，不重建 Activity）
 - 许可：**GPL-3.0-only** · 非官方客户端声明见 [`NOTICE`](NOTICE)
+- 布局尺寸全部取自 `res/values/dimens.xml`（不写死 dp）；设置页卡片内的逻辑组用细分隔线隔开（不拆卡）
 
 > 技术细节与规范见 [`SPEC.md`](SPEC.md)；设计任务书与播放器定案见 [`docs/`](docs/)。
 
@@ -29,6 +30,8 @@
 + 上下边缘渐变；进度条支持标准 / 波浪两种样式；迷你条上拉跟手预览、过阈值进入播放页，
 迷你条封面是**旋转唱片**（播放时转动 + 圆形进度环）。
 工具行含**音质**、**倍速**、**循环模式**（列表 / 单曲 / 随机）、**定时关闭**；
+三点菜单最上方是**评论**：最热 / 最新两个排序（触底自动翻页）、点赞、按条展开追评、
+填了 Cookie 就能在底部发评论 / 回复某条；
 支持下载当前歌曲到 `Download/MelodriftMusic`（Android 9 及以下首次下载会请求存储权限）。
 
 **后台与控制**
@@ -41,6 +44,7 @@
 | 账户 | 网易云 Cookie（含连接测试） |
 | 播放 | 默认音质、淡入淡出（开关 + 时长）、允许与其他应用同时播放、恢复播放位置、**播放页显示状态栏** |
 | 外观 | **深色模式（跟随系统 / 浅色 / 深色）**、语言、迷你条样式、进度条样式、歌词上下渐变 |
+| 数据 | 导出 / 导入设置（JSON，**不含 Cookie**） |
 | 关于 | **应用图标（居中置顶）**、版本、**GitHub 仓库（跳转）**、用户协议 / 隐私政策 / 免责声明、崩溃日志查看 |
 
 ## 构建
@@ -89,7 +93,7 @@ keytool -genkeypair -v -keystore melodrift.keystore -alias melodrift \
 melodrift-music/
 ├── README.md / SPEC.md                 # 本说明 / 技术规范
 ├── LICENSE / NOTICE                    # GPL-3.0-only 全文 / 非官方声明与使用限制
-├── docs/                               # 设计任务书 + 播放器技术定案
+├── docs/                               # 设计任务书 + 播放器技术定案（历史文档）
 ├── settings.gradle.kts                 # 阿里云镜像仓库 + flatDir(libs)
 ├── build.gradle.kts                    # AGP / Kotlin compose 插件版本
 ├── gradle.properties                   # JVM 参数 / aapt2 覆盖 / 签名密码（分发时移除）
@@ -102,9 +106,9 @@ melodrift-music/
         │   ├── net/                    # NcmApi(接口) NcmCrypto(加密) Models(模型) Lyrics(歌词) Downloader(下载)
         │   ├── player/                 # PlayerController(全局播放器) MusicPlaybackService(前台服务/通知)
         │   ├── data/                   # Settings + 历史/进度/收藏/搜索历史等本地存储
-        │   ├── ui/                     # Compose 界面（导航、各页面、主题）
+        │   ├── ui/                     # Compose 界面（导航、各页面、主题、评论面板、迷你条手势）
         │   └── util/CrashLog.kt        # 未捕获异常落盘，供「关于」查看
-        └── res/                        # 图标、通知图标、中英文案、主题、网络安全配置
+        └── res/                        # 图标、通知图标、中英文案、主题、尺寸令牌(dimens)、网络安全配置
 ```
 
 ## 使用前提
@@ -117,6 +121,7 @@ melodrift-music/
 
 - 仅 arm64-v8a（不含 x86 / armeabi-v7a，模拟器需 arm64 镜像）
 - 逐字歌词（KRC）未实现，当前为普通 YRC/文本歌词（原文 + 译文两行）
+- 不能删除自己已发的评论（接口可用，暂未出入口）
 - 不支持从歌单批量移除曲目（`manipulateTracks` 目前只用于「收藏到歌单」的单首多歌增删）
 - `NcmCrypto` 里的 eapi 加密已实现但暂无业务调用（下载走 weapi 播放地址）
 - 媒体会话仍基于 `androidx.media` 的 `MediaSessionCompat`（该库 1.8.0 起整体标记废弃），
@@ -134,7 +139,7 @@ melodrift-music/
 所有正式构建均由同一密钥签名（密钥库**不**随源码分发）。安装前可比对证书指纹：
 
 ```bash
-apksigner verify --print-certs melodrift-music-v1.0.3-arm64-v8a.apk
+apksigner verify --print-certs melodrift-music-v1.0.4-arm64-v8a.apk
 # Signer #1 certificate DN: CN=Melodrift Music, OU=App, O=Melodrift, L=Internet, ST=Internet, C=CN
 # Signer #1 certificate SHA-256 digest: a23f2a54243069e53e85a12accfd236dd51464c2b561f88aa333582c4b933276
 ```

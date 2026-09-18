@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -164,7 +165,7 @@ fun LibraryScreen(
     LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 16.dp)
+            .padding(horizontal = dimensionResource(R.dimen.page_padding))
     ) {
         item {
             Text(
@@ -204,7 +205,7 @@ fun LibraryScreen(
                     stringResource(R.string.library_no_liked),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    modifier = Modifier.padding(vertical = dimensionResource(R.dimen.space_s))
                 )
             }
         }
@@ -217,7 +218,7 @@ fun LibraryScreen(
                     stringResource(R.string.library_no_subscribed),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    modifier = Modifier.padding(vertical = dimensionResource(R.dimen.space_s))
                 )
             } else {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -250,7 +251,7 @@ fun LibraryScreen(
                     stringResource(R.string.library_no_created),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(vertical = 8.dp)
+                    modifier = Modifier.padding(vertical = dimensionResource(R.dimen.space_s))
                 )
             } else {
                 Column {
@@ -259,7 +260,7 @@ fun LibraryScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable { onOpenPlaylist(pl.id, pl.name) }
-                                .padding(vertical = 8.dp),
+                                .padding(vertical = dimensionResource(R.dimen.space_s)),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             CoverImage(
@@ -288,7 +289,7 @@ fun LibraryScreen(
                 }
             }
         }
-        item { Spacer(Modifier.height(16.dp)) }
+        item { Spacer(Modifier.height(dimensionResource(R.dimen.space_l))) }
     }
     }
 
@@ -373,7 +374,7 @@ private fun LikedMusicCard(pl: Playlist, onClick: () -> Unit) {
         modifier = Modifier
             .fillMaxWidth()
             .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
+            .padding(vertical = dimensionResource(R.dimen.space_s)),
         verticalAlignment = Alignment.CenterVertically
     ) {
         CoverImage(

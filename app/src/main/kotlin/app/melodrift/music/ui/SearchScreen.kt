@@ -42,6 +42,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -121,8 +122,8 @@ fun SearchScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().padding(horizontal = 16.dp)) {
-        Spacer(Modifier.height(12.dp))
+    Column(Modifier.fillMaxSize().padding(horizontal = dimensionResource(R.dimen.page_padding))) {
+        Spacer(Modifier.height(dimensionResource(R.dimen.space_m)))
         OutlinedTextField(
             value = keyword,
             onValueChange = {

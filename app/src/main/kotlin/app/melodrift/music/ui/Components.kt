@@ -17,6 +17,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,7 +29,6 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -38,6 +40,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AddCircleOutline
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Refresh
@@ -46,11 +49,13 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -63,7 +68,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.dimensionResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -109,7 +116,7 @@ fun LegalContentDialog(kind: String, onDismiss: () -> Unit) {
                 style = MaterialTheme.typography.bodyMedium,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .heightIn(max = 360.dp)
+                    .heightIn(max = dimensionResource(R.dimen.dialog_list_max_height))
                     .verticalScroll(rememberScrollState())
             )
         },
@@ -472,7 +479,7 @@ fun LoadingBox(message: String = "Loading…") {
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             CircularProgressIndicator()
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(dimensionResource(R.dimen.space_m)))
             Text(message, style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
@@ -490,7 +497,7 @@ fun ErrorBox(message: String, onRetry: () -> Unit) {
                 textAlign = TextAlign.Center,
                 modifier = Modifier.padding(horizontal = 32.dp)
             )
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(dimensionResource(R.dimen.space_m)))
             IconButton(onClick = onRetry) {
                 Icon(Icons.Filled.Refresh, contentDescription = "Retry")
             }
@@ -543,7 +550,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
         text,
         style = MaterialTheme.typography.titleMedium,
         color = MaterialTheme.colorScheme.primary,
-        modifier = modifier.padding(vertical = 8.dp)
+        modifier = modifier.padding(vertical = dimensionResource(R.dimen.space_s))
     )
 }
 
@@ -630,4 +637,91 @@ fun openExternalUrl(context: Context, url: String) {
     } catch (_: Exception) {
         Toast.makeText(context, R.string.no_browser, Toast.LENGTH_SHORT).show()
     }
+}
+
+
+/** 单选弹窗的一个选项 */
+@Immutable
+data class SelectionOption(
+    val key: String,
+    val label: String,
+    val subtitle: String? = null
+)
+
+/**
+ * **所有单选弹窗共用的选择界面**（音质 / 语言 / 深色模式 / 迷你条 / 进度条 / 淡入淡出时长 /
+ * 下载音质…）。以前每个设置项都手写一份 `AlertDialog + RadioRow`，间距、命中区、
+ * 长列表在小屏上溢出各处不一，这里统一：
+ *
+ * - 整行可点（单选钮 + 文案 + 选中对勾），行高 ≥ 52dp
+ * - 列表最高 48% 屏高并可滚动（倍速/音质档位多时不会顶出屏幕）
+ * - 只保留「取消」，选中即生效并关闭
+ */
+@Composable
+fun SelectionDialog(
+    title: String,
+    options: List<SelectionOption>,
+    selectedKey: String,
+    onSelected: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(title) },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = dimensionResource(R.dimen.dialog_list_max_height))
+                    .verticalScroll(rememberScrollState())
+            ) {
+                options.forEach { option ->
+                    val selected = option.key == selectedKey
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable { onSelected(option.key) }
+                            .padding(
+                                horizontal = dimensionResource(R.dimen.space_xs),
+                                vertical = dimensionResource(R.dimen.space_m)
+                            ),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        RadioButton(selected = selected, onClick = null)
+                        Spacer(Modifier.width(dimensionResource(R.dimen.space_m)))
+                        Column(Modifier.weight(1f)) {
+                            Text(
+                                option.label,
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = if (selected) FontWeight.Medium else FontWeight.Normal,
+                                color = if (selected) MaterialTheme.colorScheme.primary
+                                else MaterialTheme.colorScheme.onSurface
+                            )
+                            val sub = option.subtitle
+                            if (!sub.isNullOrBlank()) {
+                                Text(
+                                    sub,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+                        if (selected) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+        }
+    )
 }

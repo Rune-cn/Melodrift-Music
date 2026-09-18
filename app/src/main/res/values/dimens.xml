@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  布局尺寸令牌：所有间距 / 圆角 / 行高 / 控件尺寸的唯一来源。
+
+  为什么单独放 res：
+  1. 不把布局常量烧进 dex —— 改一处即可全局生效，也能按屏幕密度 / 横竖屏开限定目录
+     （values-sw600dp、land）而不动代码；
+  2. Flutter 移植时这张表就是 Design Token 清单，直接抄成 dart 常量或 ThemeExtension，
+     不必再去 8000 行 Compose 里考古散落的 12.dp / 16.dp。
+
+  命名：space_* 间距栅格；component 尺寸用 <用处>_<角色>。
+-->
+<resources>
+    <!-- 间距栅格（4 的倍数） -->
+    <dimen name="space_xs">2dp</dimen>
+    <dimen name="space_s">8dp</dimen>
+    <dimen name="space_m">12dp</dimen>
+    <dimen name="space_l">16dp</dimen>
+    <dimen name="space_xl">24dp</dimen>
+    <dimen name="space_xxl">32dp</dimen>
+
+    <!-- 页面 / 列表 -->
+    <dimen name="page_padding">16dp</dimen>
+    <dimen name="page_padding_wide">32dp</dimen>
+    <dimen name="list_bottom_padding">24dp</dimen>
+    <dimen name="section_gap">16dp</dimen>
+    <dimen name="card_gap">12dp</dimen>
+    <dimen name="card_radius">16dp</dimen>
+    <dimen name="row_padding_h">20dp</dimen>
+    <dimen name="row_padding_v">16dp</dimen>
+    <dimen name="icon_button_touch_min">48dp</dimen>
+
+    <!-- 封面 / 头像 -->
+    <dimen name="cover_page_radius">20dp</dimen>
+    <dimen name="cover_mini">40dp</dimen>
+    <dimen name="cover_mini_ring">46dp</dimen>
+    <dimen name="cover_list">56dp</dimen>
+    <dimen name="avatar_default">40dp</dimen>
+    <dimen name="about_logo">88dp</dimen>
+    <dimen name="about_logo_radius">22dp</dimen>
+
+    <!-- 播放页 -->
+    <dimen name="player_tools_icon">22dp</dimen>
+    <dimen name="progress_track_height">4dp</dimen>
+    <dimen name="progress_touch_height">48dp</dimen>
+    <dimen name="lyrics_side_padding">32dp</dimen>
+    <dimen name="lyrics_fade_distance">120dp</dimen>
+    <dimen name="lyrics_line_padding_v">6dp</dimen>
+
+    <!-- 评论面板 -->
+    <dimen name="comment_avatar">36dp</dimen>
+    <dimen name="comment_floor_avatar">28dp</dimen>
+    <dimen name="comment_action_width">48dp</dimen>
+    <dimen name="comment_like_icon">20dp</dimen>
+    <dimen name="comment_placeholder_height">320dp</dimen>
+    <dimen name="composer_max_height">120dp</dimen>
+
+    <!-- 菜单 -->
+    <dimen name="menu_icon">20dp</dimen>
+
+    <!-- 弹窗 -->
+    <dimen name="dialog_list_max_height">360dp</dimen>
+    <dimen name="dialog_cookie_field_height">160dp</dimen>
+</resources>

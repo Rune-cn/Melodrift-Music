@@ -178,5 +178,5 @@ aapt2 dump resources app-release.apk
 # ✅ 直接对二进制按 UTF-8 匹配：
 unzip -p app-release.apk classes.dex | grep -cP '\p{Han}'
 # 注意：命中数包含依赖库自带的中文，不等于"本应用 UI 有硬编码文案"；
-#      本仓库实测 107 行命中，来源是 net/ 层异常文案与 亿/万 单位（见 SPEC.md §5.5 已知例外）。
+#      本仓库实测 107 行命中，来源是 net/ 层异常文案与 亿/万 单位（见 SPEC.md §5.7 已知例外）。
 ```
