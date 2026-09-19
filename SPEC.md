@@ -8,7 +8,7 @@
 | 项 | 值 |
 |------|------|
 | 命名空间 / applicationId | `app.melodrift.music` |
-| 版本 | 1.0.4（versionCode 5） |
+| 版本 | 1.0.5（versionCode 6） |
 | compileSdk / targetSdk / minSdk | 37 / **36（Android 16）** / 26 |
 | ABI | 仅 `arm64-v8a` |
 | 语言资源 | 仅 `zh-rCN` + `en`（`resourceConfigurations`）。注意英文是**默认 `values/`**，
@@ -239,7 +239,7 @@ util ────────────── CrashLog
 ### 5.7 资源与文案
 
 - 全部文案进 `values/strings.xml`（en）+ `values-zh-rCN/strings.xml`（zh），**key 与中英一一对应**
-  （当前各 232 条，可用 `diff <(grep -o 'name="…"' values/strings.xml|sort) <(… values-zh-rCN/…|sort)` 校验）；
+  （当前各 242 条，可用 `diff <(grep -o 'name="…"' values/strings.xml|sort) <(… values-zh-rCN/…|sort)` 校验）；
   ui 层一律 `stringResource()`，不得新增硬编码文案。
 - **已知例外（待办，见 §8）**：`net/` 层异常文案与兜底名仍是中文字面量
   （`"未登录：cookie 中缺少有效的 MUSIC_U"`、`"每日推荐为空（可能未登录）"`、`"歌单不存在"`、

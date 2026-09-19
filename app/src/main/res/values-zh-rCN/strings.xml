@@ -259,4 +259,12 @@
     <string name="comments_floor_count">共 %1$d 条追评</string>
     <string name="comments_expand_hint">…点击展开</string>
     <string name="comments_collapse_hint">收起</string>
+    <string name="detail_publish_time">发行时间</string>
+    <string name="detail_company">发行公司</string>
+    <string name="detail_lyricist">作词</string>
+    <string name="detail_composer">作曲</string>
+    <string name="detail_arranger">编曲</string>
+    <string name="license">开源许可</string>
+    <string name="license_brief">本项目以 GPL-3.0-only 开源（协议全文见仓库 LICENSE 文件）。</string>
+    <string name="license_open_full">查看完整协议</string>
 </resources>

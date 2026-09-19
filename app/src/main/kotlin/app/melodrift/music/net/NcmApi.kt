@@ -346,6 +346,31 @@ object NcmApi {
         )
     }
 
+    // ───────────────────────── 专辑 ─────────────────────────
+
+    /**
+     * 专辑详情（官方接口 `/api/v1/album/{id}`）：补全**发行时间**与**发行公司**。
+     * v3 歌曲详情里的 album 只有 id/name/封面，这两个字段是 null（实测）。
+     * 失败返回 null（详情弹窗里静默处理，不影响主流程）。
+     */
+    fun albumDetail(albumId: Long): AlbumDetail? {
+        if (albumId <= 0) return null
+        return try {
+            val j = JSONObject(weapiPost("/api/v1/album/$albumId", mapOf()))
+            checkCode(j, "album detail")
+            val a = j.optJSONObject("album") ?: return null
+            AlbumDetail(
+                id = a.optLong("id", albumId),
+                name = Json.strOrNull(a, "name") ?: "",
+                company = Json.strOrNull(a, "company") ?: "",
+                publishTimeMs = a.optLong("publishTime", 0L),
+                picUrl = Json.strOrNull(a, "picUrl")
+            )
+        } catch (_: Exception) {
+            null
+        }
+    }
+
     // ───────────────────────── 评论 ─────────────────────────
 
     /** 歌曲评论的会话 id */

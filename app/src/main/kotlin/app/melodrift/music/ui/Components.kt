@@ -102,9 +102,11 @@ fun qualityLabel(level: String): String = when (level) {
 /** 协议全文弹窗（用户协议 / 隐私政策 / 免责声明），文本可滚动 */
 @Composable
 fun LegalContentDialog(kind: String, onDismiss: () -> Unit) {
+    val ctx = LocalContext.current
     val (title, text) = when (kind) {
         "terms" -> stringResource(R.string.terms_title) to stringResource(R.string.terms_text)
         "privacy" -> stringResource(R.string.privacy_title) to stringResource(R.string.privacy_text)
+        "license" -> stringResource(R.string.license) to stringResource(R.string.license_brief)
         else -> stringResource(R.string.disclaimer_title) to stringResource(R.string.disclaimer_text)
     }
     AlertDialog(
@@ -121,8 +123,18 @@ fun LegalContentDialog(kind: String, onDismiss: () -> Unit) {
             )
         },
         confirmButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.confirm))
+            if (kind == "license") {
+                // 完整协议在仓库 LICENSE：直接打开 GitHub（离线只有简介）
+                TextButton(onClick = {
+                    onDismiss()
+                    openExternalUrl(ctx, GITHUB_URL + "/blob/main/LICENSE")
+                }) {
+                    Text(stringResource(R.string.license_open_full))
+                }
+            } else {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.confirm))
+                }
             }
         }
     )

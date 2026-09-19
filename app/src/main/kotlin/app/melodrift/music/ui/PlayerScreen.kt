@@ -14,6 +14,9 @@ import androidx.compose.ui.graphics.StrokeCap
 import kotlin.math.sin
 
 import android.widget.Toast
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
@@ -44,7 +47,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.FastForward
 import androidx.compose.material.icons.filled.FastRewind
@@ -108,6 +113,8 @@ import android.content.Context
 import app.melodrift.music.R
 import app.melodrift.music.data.SavedSongsCache
 import app.melodrift.music.net.Downloader
+import app.melodrift.music.net.AlbumDetail
+import app.melodrift.music.net.LyricRow
 import app.melodrift.music.net.NcmApi
 import app.melodrift.music.net.Song
 import app.melodrift.music.player.LoopMode
@@ -316,14 +323,32 @@ private fun CoverPage(song: Song) {
         }
     }
 
-    // 歌曲信息对话框（封面 + 完整信息）
+    // 歌曲信息对话框（封面 + 官方接口补全的完整信息）
     if (showDetail) {
+        var albumInfo by remember(song.id) { mutableStateOf<AlbumDetail?>(null) }
+        var credits by remember(song.id) { mutableStateOf<Map<String, String>>(emptyMap()) }
+        val detailScope = rememberCoroutineScope()
+        LaunchedEffect(song.id) {
+            detailScope.launch {
+                val info = withContext(Dispatchers.IO) {
+                    NcmApi.albumDetail(song.album?.id ?: 0L)
+                }
+                if (info != null) albumInfo = info
+                // 作词/作曲/编曲：官方歌词接口头部就是制作信息行，顺路解析
+                val rows = withContext(Dispatchers.IO) {
+                    try { NcmApi.lyric(song.id) } catch (_: Exception) { emptyList() }
+                }
+                credits = extractCredits(rows)
+            }
+        }
         AlertDialog(
             onDismissRequest = { showDetail = false },
             title = { Text(stringResource(R.string.detail)) },
             text = {
                 Column(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .verticalScroll(rememberScrollState()),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     CoverImage(
@@ -367,6 +392,25 @@ private fun CoverPage(song: Song) {
                         if (song.isVip) stringResource(R.string.detail_vip)
                         else stringResource(R.string.detail_free)
                     )
+                    if (albumInfo != null) {
+                        val a = albumInfo ?: return@Column
+                        if (a.publishTimeMs > 0) {
+                            DetailRow(
+                                stringResource(R.string.detail_publish_time),
+                                SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(a.publishTimeMs))
+                            )
+                        }
+                        if (a.company.isNotBlank()) {
+                            DetailRow(stringResource(R.string.detail_company), a.company)
+                        }
+                    }
+                    listOf("作词" to R.string.detail_lyricist, "作曲" to R.string.detail_composer, "编曲" to R.string.detail_arranger)
+                        .forEach { (key, labelRes) ->
+                            val v = credits[key]
+                            if (!v.isNullOrBlank()) {
+                                DetailRow(stringResource(labelRes), v)
+                            }
+                        }
                 }
             },
             confirmButton = {
@@ -398,6 +442,27 @@ private fun CoverPage(song: Song) {
     if (showComments) {
         CommentSheet(song = song, onDismiss = { showComments = false })
     }
+}
+
+/**
+ * 从歌词（官方接口返回，头部就是制作信息行）里提取 作词/作曲/编曲。
+ * 找不到的键不出现；歌词页里这些行不参与译文配对（见 net/Lyrics.kt），但详情里展示出来。
+ */
+private fun extractCredits(rows: List<LyricRow>): Map<String, String> {
+    val keys = listOf("作词", "作曲", "编曲")
+    val out = LinkedHashMap<String, String>()
+    for (r in rows) {
+        val t = r.text.trim()
+        for (k in keys) {
+            if (t.startsWith(k) && !out.containsKey(k)) {
+                val v = t.removePrefix(k)
+                    .trim().removePrefix(":").trim().removePrefix("：").trim()
+                if (v.isNotEmpty()) out[k] = v
+            }
+        }
+        if (out.size == keys.size) break
+    }
+    return out
 }
 
 @Composable

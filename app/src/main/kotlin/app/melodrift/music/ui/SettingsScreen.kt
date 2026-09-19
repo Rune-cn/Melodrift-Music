@@ -625,6 +625,10 @@ private fun SettingsSectionPage(
                         onClick = { legalKind = "disclaimer" }
                     )
                     SettingsRow(
+                        title = stringResource(R.string.license),
+                        onClick = { legalKind = "license" }
+                    )
+                    SettingsRow(
                         title = stringResource(R.string.crash_log),
                         showDivider = false,
                         onClick = {

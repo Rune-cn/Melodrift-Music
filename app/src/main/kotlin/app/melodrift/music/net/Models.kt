@@ -46,6 +46,16 @@ data class Playlist(
     val subscribed: Boolean = false
 )
 
+/** 专辑详情（官方 `/api/v1/album/{id}`）：v3 歌曲详情里的 album 不含发行时间/公司，需另查 */
+@Immutable
+data class AlbumDetail(
+    val id: Long,
+    val name: String,
+    val company: String,
+    val publishTimeMs: Long,
+    val picUrl: String?
+)
+
 /**
  * 歌曲评论（网易云 `/api/comment/resource/comments/get`）。
  *

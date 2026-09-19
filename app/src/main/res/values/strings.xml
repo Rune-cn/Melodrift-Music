@@ -259,4 +259,12 @@ Make sure a valid cookie (MUSIC_U) is set in Settings.</string>
     <string name="comments_floor_count">%1$d replies</string>
     <string name="comments_expand_hint">…tap to expand</string>
     <string name="comments_collapse_hint">Collapse</string>
+    <string name="detail_publish_time">Released</string>
+    <string name="detail_company">Company</string>
+    <string name="detail_lyricist">Lyricist</string>
+    <string name="detail_composer">Composer</string>
+    <string name="detail_arranger">Arranger</string>
+    <string name="license">Open source license</string>
+    <string name="license_brief">This app is open source under GPL-3.0-only (see LICENSE in the repository).</string>
+    <string name="license_open_full">View full license</string>
 </resources>

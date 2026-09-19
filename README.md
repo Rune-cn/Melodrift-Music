@@ -3,7 +3,7 @@
 网易云音乐第三方 Android 客户端。**Jetpack Compose + Material 3**，登录走网页版 Cookie，
 接口为网易云 web 端（weapi 加密），播放基于 **androidx.media3 ExoPlayer**。
 
-- 包名 `app.melodrift.music` · 当前版本 **1.0.4**（versionCode 5）
+- 包名 `app.melodrift.music` · 当前版本 **1.0.5**（versionCode 6）
 - `minSdk 26` / `targetSdk 36`（Android 16）/ `compileSdk 37`，仅打包 **arm64-v8a**
 - 界面语言：中 / 英（应用内即时切换，不重建 Activity）
 - 许可：**GPL-3.0-only** · 非官方客户端声明见 [`NOTICE`](NOTICE)
@@ -139,7 +139,7 @@ melodrift-music/
 所有正式构建均由同一密钥签名（密钥库**不**随源码分发）。安装前可比对证书指纹：
 
 ```bash
-apksigner verify --print-certs melodrift-music-v1.0.4-arm64-v8a.apk
+apksigner verify --print-certs melodrift-music-v1.0.5-arm64-v8a.apk
 # Signer #1 certificate DN: CN=Melodrift Music, OU=App, O=Melodrift, L=Internet, ST=Internet, C=CN
 # Signer #1 certificate SHA-256 digest: a23f2a54243069e53e85a12accfd236dd51464c2b561f88aa333582c4b933276
 ```

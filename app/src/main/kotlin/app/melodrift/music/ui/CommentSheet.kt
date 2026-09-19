@@ -84,6 +84,9 @@ private const val FLOOR_PAGE = 10
 /** 追评首屏预览条数：不按按钮也能先看到几条热门追评 */
 private const val FLOOR_PREVIEW = 3
 
+/** 一条评论的追评区状态机（收起/展开/无追评/加载中） */
+private enum class FloorState { IDLE, LOADING, HAS_REPLIES, NO_REPLIES, COLLAPSED }
+
 /** 排序：只有 最热 / 最新 两个 tab（「推荐」不做） */
 private val SORT_ORDER = listOf(CommentSort.HOT, CommentSort.LATEST)
 
@@ -118,8 +121,7 @@ private class TabState {
     /** 追评：父评论 id → 已拉到的列表 / 加载态 / 是否还有更多 / 下一页游标 */
     val floors = mutableStateMapOf<Long, MutableList<Comment>>()
     val floorTotal = mutableStateMapOf<Long, Int>()
-    val floorPreviewLoaded = mutableStateMapOf<Long, Boolean>()
-    val floorLoading = mutableStateMapOf<Long, Boolean>()
+    val floorState = mutableStateMapOf<Long, FloorState>()
     val floorHasMore = mutableStateMapOf<Long, Boolean>()
     val floorCursor = mutableStateMapOf<Long, Long>()
 
@@ -212,9 +214,8 @@ private fun CommentsContent(song: Song, onClose: () -> Unit) {
     }
 
     suspend fun loadFloors(parent: Comment, preview: Boolean = false) {
-        if (tab.floorLoading[parent.id] == true) return
-        if (preview && tab.floorPreviewLoaded[parent.id] == true) return
-        tab.floorLoading[parent.id] = true
+        if (tab.floorState[parent.id] == FloorState.LOADING) return
+        tab.floorState[parent.id] = FloorState.LOADING
         val first = tab.floors[parent.id].isNullOrEmpty()
         val cursor = if (first) -1L else tab.floorCursor[parent.id] ?: -1L
         val limit = if (preview) FLOOR_PREVIEW else FLOOR_PAGE
@@ -233,14 +234,16 @@ private fun CommentsContent(song: Song, onClose: () -> Unit) {
             if (page.total > 0) tab.floorTotal[parent.id] = page.total
             tab.floorHasMore[parent.id] = page.hasMore && page.comments.isNotEmpty()
             tab.floorCursor[parent.id] = page.nextTime
-            if (preview || tab.floorPreviewLoaded[parent.id] != true) {
-                tab.floorPreviewLoaded[parent.id] = true
-            }
+            val hasAny = (tab.floorTotal[parent.id] ?: 0) > 0 || list.isNotEmpty()
+            tab.floorState[parent.id] =
+                if (hasAny) FloorState.HAS_REPLIES else FloorState.NO_REPLIES
         } else if (preview) {
-            // 预览失败静默：不弹错，用户仍可点「追评」主动加载
-            tab.floorPreviewLoaded[parent.id] = true
+            // 预览失败：回 IDLE —— 列表滚走再滚回来会自动重试，也保留「追评」按钮兜底
+            tab.floorState[parent.id] = FloorState.IDLE
+        } else {
+            // 展开失败：保留已有内容，允许再点「展开追评」
+            tab.floorState[parent.id] = FloorState.HAS_REPLIES
         }
-        tab.floorLoading[parent.id] = false
     }
 
     suspend fun submit() {
@@ -385,15 +388,25 @@ private fun CommentsContent(song: Song, onClose: () -> Unit) {
                             onCopy = { copyTarget = c },
                             floors = tab.floors[c.id],
                             floorTotal = tab.floorTotal[c.id],
-                            floorLoading = tab.floorLoading[c.id] == true,
+                            floorState = tab.floorState[c.id] ?: FloorState.IDLE,
                             floorHasMore = tab.floorHasMore[c.id] == true,
                             onExpandFloors = { scope.launch { loadFloors(c) } },
                             onCollapseFloors = {
                                 tab.floors.remove(c.id)
-                                tab.floorPreviewLoaded.remove(c.id)
+                                // 收起 = 暂时不想看：置 COLLAPSED，滚走再回来不自动重弹，
+                                // 但保留「追评」按钮可以手动再展开
+                                tab.floorState[c.id] = FloorState.COLLAPSED
                             },
                             onLoadPreview = {
+                                if (tab.floors[c.id].isNullOrEmpty() &&
+                                    tab.floorState[c.id] != FloorState.COLLAPSED
+                                ) {
+                                    scope.launch { loadFloors(c, preview = true) }
+                                }
+                            },
+                            onForceLoad = {
                                 if (tab.floors[c.id].isNullOrEmpty()) {
+                                    tab.floorState[c.id] = FloorState.IDLE
                                     scope.launch { loadFloors(c, preview = true) }
                                 }
                             },
@@ -562,16 +575,19 @@ private fun CommentBlock(
     onCopy: () -> Unit,
     floors: List<Comment>?,
     floorTotal: Int?,
-    floorLoading: Boolean,
+    floorState: FloorState,
     floorHasMore: Boolean,
     onExpandFloors: () -> Unit,
     onCollapseFloors: () -> Unit,
     onLoadPreview: () -> Unit,
+    onForceLoad: () -> Unit,
     onLikeComment: (Comment) -> Unit,
     onReply: (Comment) -> Unit
 ) {
-    // 组合即尝试加载首屏追评预览（每条评论都自动，失败静默）
-    LaunchedEffect(comment.id) { onLoadPreview() }
+    // 只有从未加载过（IDLE）才自动拉首屏预览；收起/无追评/加载中都交给状态机
+    LaunchedEffect(comment.id) {
+        if (floorState == FloorState.IDLE) onLoadPreview()
+    }
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -635,62 +651,79 @@ private fun CommentBlock(
             )
         }
 
-        // 追评区：没有追评（预览为空）→ 什么都不显示；有追评 → 显示预览框，
-        // 未到底时按钮「展开追评」，到底后「收起追评」
-        if (!floors.isNullOrEmpty()) {
-            Surface(
-                shape = RoundedCornerShape(dimensionResource(R.dimen.card_radius)),
-                color = MaterialTheme.colorScheme.surfaceContainerLow,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(
-                        start = dimensionResource(R.dimen.comment_avatar) +
-                            dimensionResource(R.dimen.space_m),
-                        top = dimensionResource(R.dimen.space_s)
-                    )
-            ) {
-                Column(modifier = Modifier.padding(dimensionResource(R.dimen.space_s))) {
-                    val total = floorTotal
-                    if (total != null && total > 0) {
-                        Text(
-                            stringResource(R.string.comments_floor_count, total),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+        // 追评区状态机：
+        //  HAS_REPLIES → 预览框（共N条 + 列表 + 展开/收起）
+        //  NO_REPLIES  → 查过确实没有追评，什么都不显示
+        //  COLLAPSED   → 已收起：只留「追评」按钮可再展开
+        //  IDLE/LOADING→ 未加载/加载中：LOADING 显示轻量提示；IDLE 显示「追评」按钮兜底
+        when {
+            !floors.isNullOrEmpty() && floorState != FloorState.COLLAPSED -> {
+                Surface(
+                    shape = RoundedCornerShape(dimensionResource(R.dimen.card_radius)),
+                    color = MaterialTheme.colorScheme.surfaceContainerLow,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(
+                            start = dimensionResource(R.dimen.comment_avatar) +
+                                dimensionResource(R.dimen.space_m),
+                            top = dimensionResource(R.dimen.space_s)
                         )
-                    }
-                    floors.forEach { f ->
-                        FloorRow(
-                            comment = f,
-                            onLike = { onLikeComment(f) },
-                            onReply = { onReply(f) }
-                        )
-                    }
-                    if (floorLoading) {
-                        Text(
-                            stringResource(R.string.comments_floor_loading),
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(vertical = dimensionResource(R.dimen.space_s))
-                        )
-                    } else {
-                        Text(
-                            stringResource(
-                                if (floorHasMore) R.string.comments_floor_more
-                                else R.string.comments_floor_hide
-                            ),
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier
-                                .clickable {
-                                    if (floorHasMore) onExpandFloors() else onCollapseFloors()
+                ) {
+                    Column(modifier = Modifier.padding(dimensionResource(R.dimen.space_s))) {
+                        val total = floorTotal
+                        if (total != null && total > 0) {
+                            Text(
+                                stringResource(R.string.comments_floor_count, total),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        floors.forEach { f ->
+                            FloorRow(
+                                comment = f,
+                                onLike = { onLikeComment(f) },
+                                onReply = { onReply(f) }
+                            )
+                        }
+                        if (floorState == FloorState.LOADING) {
+                            Text(
+                                stringResource(R.string.comments_floor_loading),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(vertical = dimensionResource(R.dimen.space_s))
+                            )
+                        } else {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = dimensionResource(R.dimen.space_s)),
+                                horizontalArrangement = androidx.compose.foundation.layout.Arrangement.spacedBy(
+                                    dimensionResource(R.dimen.space_l)
+                                )
+                            ) {
+                                if (floorHasMore) {
+                                    Text(
+                                        stringResource(R.string.comments_floor_more),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.clickable(onClick = onExpandFloors)
+                                    )
                                 }
-                                .padding(top = dimensionResource(R.dimen.space_s))
-                        )
+                                Text(
+                                    stringResource(R.string.comments_floor_hide),
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.clickable(onClick = onCollapseFloors)
+                                )
+                            }
+                        }
                     }
                 }
             }
-        } else if (floorLoading) {
-            Text(
+
+            floorState == FloorState.NO_REPLIES -> Unit   // 确认无追评，不显示
+
+            floorState == FloorState.LOADING -> Text(
                 stringResource(R.string.comments_floor_loading),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -699,6 +732,22 @@ private fun CommentBlock(
                         dimensionResource(R.dimen.space_m),
                     top = dimensionResource(R.dimen.space_s)
                 )
+            )
+
+            else -> Text(
+                stringResource(
+                    if (floorState == FloorState.COLLAPSED) R.string.comments_floor_more
+                    else R.string.comments_floor
+                ),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+                modifier = Modifier
+                    .clickable(onClick = onForceLoad)
+                    .padding(
+                        start = dimensionResource(R.dimen.comment_avatar) +
+                            dimensionResource(R.dimen.space_m),
+                        top = dimensionResource(R.dimen.space_s)
+                    )
             )
         }
     }
