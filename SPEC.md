@@ -8,7 +8,7 @@
 | 项 | 值 |
 |------|------|
 | 命名空间 / applicationId | `app.melodrift.music` |
-| 版本 | 1.0.5（versionCode 6） |
+| 版本 | 1.0.6（versionCode 7） |
 | compileSdk / targetSdk / minSdk | 37 / **36（Android 16）** / 26 |
 | ABI | 仅 `arm64-v8a` |
 | 语言资源 | 仅 `zh-rCN` + `en`（`resourceConfigurations`）。注意英文是**默认 `values/`**，

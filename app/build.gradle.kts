@@ -11,8 +11,8 @@ android {
         applicationId = "app.melodrift.music"
         minSdk = 26
         targetSdk = 36
-        versionCode = 6
-        versionName = "1.0.5"
+        versionCode = 7
+        versionName = "1.0.6"
         // 仅打包 arm64-v8a
         ndk {
             abiFilters += listOf("arm64-v8a")

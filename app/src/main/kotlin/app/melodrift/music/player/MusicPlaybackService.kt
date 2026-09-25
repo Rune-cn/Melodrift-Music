@@ -127,16 +127,9 @@ object PlaybackNotifications {
             .addAction(R.drawable.ic_notif_fwd, "fwd", actionPi(MusicPlaybackService.ACT_FWD))
             .addAction(R.drawable.ic_notif_next, "next", actionPi(MusicPlaybackService.ACT_NEXT))
 
-        // 封面：优先用会话已加载的缓存，避免重复下载
-        val cached = PlayerController.coverBitmap()
-        if (cached != null) {
-            builder.setLargeIcon(cached)
-        } else {
-            song.coverUrl?.let { url ->
-                val bmp = loadBitmapSync(url)
-                if (bmp != null) builder.setLargeIcon(bmp)
-            }
-        }
+        // 封面：用会话已加载的缓存，避免在通知构建（主线程）里做网络下载导致卡顿/ANR。
+        // 封面异步加载完成后 PlayerController 会刷新一次通知补上大图。
+        PlayerController.coverBitmap()?.let { builder.setLargeIcon(it) }
 
         return builder.build()
     }

@@ -105,8 +105,10 @@ object PlayerController {
     // ── 外观（由设置页驱动） ──
     /** 播放页进度条样式：standard / wave */
     var progressStyle by mutableStateOf("standard")
+        private set
     /** 歌词页上下边缘渐变遮罩 */
     var lyricsFade by mutableStateOf(false)
+        private set
 
     val current: Song?
         get() = queue.getOrNull(currentIndex)
@@ -306,6 +308,8 @@ object PlayerController {
                 coverBitmapCache = bmp
                 coverUrlCache = cover
                 updateSessionMetadata()
+                // 封面就绪后刷新通知，把大图补进通知栏（构建通知本身不再走网络）
+                updateNotification()
             }
         }
     }
@@ -319,7 +323,7 @@ object PlayerController {
                     "Referer" to "https://music.163.com/"
                 )
             )
-        return ExoPlayer.Builder(appContext!!)
+        return ExoPlayer.Builder(requireNotNull(appContext, { "PlayerController not initialized" }))
             .setMediaSourceFactory(DefaultMediaSourceFactory(dsFactory))
             .setAudioAttributes(
                 AudioAttributes.Builder()
@@ -770,6 +774,12 @@ object PlayerController {
 
     fun setLoopModeValue(mode: LoopMode) {
         loopMode = mode
+    }
+
+    /** 应用外观设置（进度条样式 / 歌词渐变），由设置页 / 启动时调用 */
+    fun setAppearance(progressStyle: String, lyricsFade: Boolean) {
+        this.progressStyle = progressStyle
+        this.lyricsFade = lyricsFade
     }
 
     fun nextLoopMode(): LoopMode {

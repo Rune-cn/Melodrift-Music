@@ -22,7 +22,7 @@
     <!-- 页面 / 列表 -->
     <dimen name="page_padding">16dp</dimen>
     <dimen name="page_padding_wide">32dp</dimen>
-    <dimen name="list_bottom_padding">24dp</dimen>
+    <dimen name="list_bottom_padding">80dp</dimen>
     <dimen name="section_gap">16dp</dimen>
     <dimen name="card_gap">12dp</dimen>
     <dimen name="card_radius">16dp</dimen>
@@ -54,6 +54,11 @@
     <dimen name="comment_like_icon">20dp</dimen>
     <dimen name="comment_placeholder_height">320dp</dimen>
     <dimen name="composer_max_height">120dp</dimen>
+
+    <!-- 用户主页 -->
+    <dimen name="user_avatar">72dp</dimen>
+    <dimen name="user_cover">52dp</dimen>
+    <dimen name="user_rank_width">28dp</dimen>
 
     <!-- 菜单 -->
     <dimen name="menu_icon">20dp</dimen>

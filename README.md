@@ -3,7 +3,7 @@
 网易云音乐第三方 Android 客户端。**Jetpack Compose + Material 3**，登录走网页版 Cookie，
 接口为网易云 web 端（weapi 加密），播放基于 **androidx.media3 ExoPlayer**。
 
-- 包名 `app.melodrift.music` · 当前版本 **1.0.5**（versionCode 6）
+- 包名 `app.melodrift.music` · 当前版本 **1.0.6**（versionCode 7）
 - `minSdk 26` / `targetSdk 36`（Android 16）/ `compileSdk 37`，仅打包 **arm64-v8a**
 - 界面语言：中 / 英（应用内即时切换，不重建 Activity）
 - 许可：**GPL-3.0-only** · 非官方客户端声明见 [`NOTICE`](NOTICE)
@@ -117,16 +117,6 @@ melodrift-music/
 2. 未登录时推荐 / 收藏 / 红心等账户相关接口不可用，但榜单与搜索仍可用
 3. VIP 歌曲按服务端返回的音质降级播放（`songUrlSmart`）
 
-## 已知限制
-
-- 仅 arm64-v8a（不含 x86 / armeabi-v7a，模拟器需 arm64 镜像）
-- 逐字歌词（KRC）未实现，当前为普通 YRC/文本歌词（原文 + 译文两行）
-- 不能删除自己已发的评论（接口可用，暂未出入口）
-- 不支持从歌单批量移除曲目（`manipulateTracks` 目前只用于「收藏到歌单」的单首多歌增删）
-- `NcmCrypto` 里的 eapi 加密已实现但暂无业务调用（下载走 weapi 播放地址）
-- 媒体会话仍基于 `androidx.media` 的 `MediaSessionCompat`（该库 1.8.0 起整体标记废弃），
-  迁移到 `androidx.media3.session` 是待办项，详见 `SPEC.md`「技术债」
-
 ## 许可
 
 - 代码以 **GPL-3.0-only** 授权，全文见 [`LICENSE`](LICENSE)，版权 `Copyright © 2026 Rune-cn`
@@ -139,7 +129,7 @@ melodrift-music/
 所有正式构建均由同一密钥签名（密钥库**不**随源码分发）。安装前可比对证书指纹：
 
 ```bash
-apksigner verify --print-certs melodrift-music-v1.0.5-arm64-v8a.apk
+apksigner verify --print-certs melodrift-music-v1.0.6-arm64-v8a.apk
 # Signer #1 certificate DN: CN=Melodrift Music, OU=App, O=Melodrift, L=Internet, ST=Internet, C=CN
 # Signer #1 certificate SHA-256 digest: a23f2a54243069e53e85a12accfd236dd51464c2b561f88aa333582c4b933276
 ```

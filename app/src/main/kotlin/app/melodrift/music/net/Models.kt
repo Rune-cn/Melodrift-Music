@@ -53,7 +53,8 @@ data class AlbumDetail(
     val name: String,
     val company: String,
     val publishTimeMs: Long,
-    val picUrl: String?
+    val picUrl: String?,
+    val description: String = ""
 )
 
 /**

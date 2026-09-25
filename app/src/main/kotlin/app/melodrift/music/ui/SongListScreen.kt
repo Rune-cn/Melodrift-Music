@@ -428,7 +428,7 @@ private fun PlaylistBody(
                     )
                 }
             }
-            item { Spacer(Modifier.height(dimensionResource(R.dimen.space_l))) }
+item { Spacer(Modifier.height(dimensionResource(R.dimen.list_bottom_padding))) }
         }
 
         val picker = pickerSong

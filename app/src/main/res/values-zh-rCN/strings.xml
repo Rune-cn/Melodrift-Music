@@ -264,7 +264,36 @@
     <string name="detail_lyricist">作词</string>
     <string name="detail_composer">作曲</string>
     <string name="detail_arranger">编曲</string>
+    <string name="detail_intro">简介</string>
+    <string name="expand">展开</string>
+    <string name="collapse">收起</string>
     <string name="license">开源许可</string>
     <string name="license_brief">本项目以 GPL-3.0-only 开源（协议全文见仓库 LICENSE 文件）。</string>
     <string name="license_open_full">查看完整协议</string>
+
+    <string name="user_home">个人主页</string>
+    <string name="user_tab_events">动态（%1$d）</string>
+    <string name="user_tab_playlists">歌单（%1$d）</string>
+    <string name="user_tab_record">听歌排行（%1$d）</string>
+    <string name="user_level_badge">Lv.%1$d</string>
+    <string name="user_record_week">最近一周</string>
+    <string name="user_record_all">所有时间</string>
+    <string name="user_follows">关注</string>
+    <string name="user_fans">粉丝</string>
+    <string name="user_songs">听歌</string>
+    <string name="vip_badge">黑胶VIP</string>
+    <string name="playlist_track_count">%1$d 首</string>
+    <string name="user_plays_count">%1$s 次</string>
+    <string name="user_no_playlists">暂无歌单</string>
+    <string name="user_no_record">暂无听歌记录</string>
+    <string name="user_no_followers">暂无粉丝</string>
+    <string name="user_no_following">暂无关注</string>
+    <string name="user_events">动态</string>
+    <string name="user_no_events">暂无动态</string>
+    <string name="user_events_private">暂无公开动态（可能设置了仅自己可见）</string>
+    <string name="user_events_no_more">没有更多动态了</string>
+    <string name="event_has_images">[图片]</string>
+    <string name="event_share_song">分享歌曲</string>
+    <string name="event_share_playlist">分享歌单</string>
+    <string name="event_share_photo">图片动态</string>
 </resources>

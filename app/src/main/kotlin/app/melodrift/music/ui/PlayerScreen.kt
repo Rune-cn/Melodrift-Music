@@ -125,7 +125,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun PlayerScreen(onBack: () -> Unit) {
+fun PlayerScreen(onBack: () -> Unit, onOpenUser: (Long, String) -> Unit) {
     val song = PlayerController.current
 
     Column(
@@ -166,7 +166,7 @@ fun PlayerScreen(onBack: () -> Unit) {
                 .weight(1f)
                 .fillMaxWidth()
         ) { page ->
-            if (page == 0) CoverPage(song) else LyricsPage()
+            if (page == 0) CoverPage(song, onOpenUser = onOpenUser) else LyricsPage()
         }
 
         // 底部控制区：进度 + 控制键（所有页共用）
@@ -177,7 +177,7 @@ fun PlayerScreen(onBack: () -> Unit) {
 // ═══ 封面页（左）═══
 
 @Composable
-private fun CoverPage(song: Song) {
+private fun CoverPage(song: Song, onOpenUser: (Long, String) -> Unit) {
     var saved by remember(song.id) { mutableStateOf(false) }
     var showMore by remember { mutableStateOf(false) }
     var showDetail by remember { mutableStateOf(false) }
@@ -352,7 +352,7 @@ private fun CoverPage(song: Song) {
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     CoverImage(
-                        url = song.coverUrl?.let { addParam(it, "500y500") },
+                        url = (albumInfo?.picUrl ?: song.coverUrl)?.let { addParam(it, "500y500") },
                         modifier = Modifier.size(96.dp),
                         cornerRadius = 12
                     )
@@ -411,6 +411,19 @@ private fun CoverPage(song: Song) {
                                 DetailRow(stringResource(labelRes), v)
                             }
                         }
+                    val a = albumInfo
+                    if (a != null && a.description.isNotBlank()) {
+                        Spacer(Modifier.height(dimensionResource(R.dimen.space_m)))
+                        HorizontalDivider()
+                        Spacer(Modifier.height(dimensionResource(R.dimen.space_s)))
+                        Text(
+                            stringResource(R.string.detail_intro),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.height(4.dp))
+                        CollapsibleText(a.description)
+                    }
                 }
             },
             confirmButton = {
@@ -440,7 +453,7 @@ private fun CoverPage(song: Song) {
     }
 
     if (showComments) {
-        CommentSheet(song = song, onDismiss = { showComments = false })
+        CommentSheet(song = song, onDismiss = { showComments = false }, onOpenUser = onOpenUser)
     }
 }
 
@@ -483,6 +496,31 @@ private fun DetailRow(label: String, value: String) {
             value,
             style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f)
+        )
+    }
+}
+
+/** 长文本（歌单/专辑简介）：超过阈值折叠成 3 行，点「展开/收起」切换 */
+@Composable
+private fun CollapsibleText(text: String) {
+    var expanded by remember { mutableStateOf(false) }
+    val longText = text.length > 80
+    Text(
+        text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = if (expanded || !longText) Int.MAX_VALUE else 3,
+        overflow = TextOverflow.Ellipsis
+    )
+    if (longText) {
+        Text(
+            stringResource(if (expanded) R.string.collapse else R.string.expand),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.primary,
+            modifier = Modifier
+                .clip(MaterialTheme.shapes.small)
+                .clickable { expanded = !expanded }
+                .padding(top = 4.dp)
         )
     }
 }

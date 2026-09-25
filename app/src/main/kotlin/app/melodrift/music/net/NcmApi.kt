@@ -364,7 +364,8 @@ object NcmApi {
                 name = Json.strOrNull(a, "name") ?: "",
                 company = Json.strOrNull(a, "company") ?: "",
                 publishTimeMs = a.optLong("publishTime", 0L),
-                picUrl = Json.strOrNull(a, "picUrl")
+                picUrl = Json.strOrNull(a, "picUrl"),
+                description = Json.strOrNull(a, "description").orEmpty()
             )
         } catch (_: Exception) {
             null
@@ -660,6 +661,207 @@ object NcmApi {
             out.add(Json.parsePlaylist(o))
         }
         return out
+    }
+
+    // ───────────────────────── 用户主页 ─────────────────────────
+
+    /** 用户主页信息（个人主页顶部：关注/粉丝/听歌数/等级） */
+    data class UserProfile(
+        val userId: Long,
+        val nickname: String,
+        val avatarUrl: String?,
+        val signature: String,
+        val follows: Int,
+        val followeds: Int,
+        val playlistCount: Int,
+        val eventCount: Int,
+        val level: Int,
+        val listenSongs: Int,
+        val vipType: Int,
+        val allSubscribedCount: Int
+    )
+
+    /** 用户主页信息 */
+    fun userDetail(uid: Long): UserProfile {
+        val j = JSONObject(weapiPost("/api/v1/user/detail/$uid", mapOf("uid" to uid)))
+        checkCode(j, "user detail")
+        val p = j.optJSONObject("profile") ?: throw IOException("用户不存在")
+        return UserProfile(
+            userId = p.optLong("userId", uid),
+            nickname = Json.strOrNull(p, "nickname") ?: "",
+            avatarUrl = Json.strOrNull(p, "avatarUrl"),
+            signature = Json.strOrNull(p, "signature").orEmpty(),
+            follows = p.optInt("follows", 0),
+            followeds = p.optInt("followeds", 0),
+            playlistCount = p.optInt("playlistCount", 0),
+            eventCount = p.optInt("eventCount", 0),
+            level = j.optInt("level", 0),
+            listenSongs = j.optInt("listenSongs", 0),
+            vipType = p.optInt("vipType", 0),
+            allSubscribedCount = p.optInt("allSubscribedCount", 0)
+        )
+    }
+
+    /** 关注/粉丝列表里的一个用户 */
+    data class FollowUser(
+        val userId: Long,
+        val nickname: String,
+        val avatarUrl: String?,
+        val signature: String,
+        val follows: Int,
+        val followeds: Int
+    )
+
+    /** 关注列表 */
+    fun followedUsers(uid: Long, limit: Int = 100, offset: Int = 0): List<FollowUser> {
+        val j = JSONObject(
+            weapiPost(
+                "/api/user/getfollows/$uid",
+                mapOf("userId" to uid, "limit" to limit, "offset" to offset)
+            )
+        )
+        checkCode(j, "user follows")
+        return parseFollowUsers(j.optJSONArray("follow"))
+    }
+
+    /** 粉丝列表 */
+    fun followerUsers(uid: Long, limit: Int = 100, offset: Int = 0): List<FollowUser> {
+        val j = JSONObject(
+            weapiPost(
+                "/api/user/getfolloweds",
+                mapOf("userId" to uid, "limit" to limit, "offset" to offset)
+            )
+        )
+        checkCode(j, "user followers")
+        return parseFollowUsers(j.optJSONArray("followeds"))
+    }
+
+    private fun parseFollowUsers(arr: JSONArray?): List<FollowUser> = buildList {
+        if (arr == null) return@buildList
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            if (o.optLong("userId", 0L) == 0L) continue
+            add(
+                FollowUser(
+                    userId = o.optLong("userId", 0L),
+                    nickname = Json.strOrNull(o, "nickname") ?: "",
+                    avatarUrl = Json.strOrNull(o, "avatarUrl"),
+                    signature = Json.strOrNull(o, "signature").orEmpty(),
+                    follows = o.optInt("follows", 0),
+                    followeds = o.optInt("followeds", 0)
+                )
+            )
+        }
+    }
+
+    // ───────────────────────── 用户动态 ─────────────────────────
+
+    /** 用户动态里的一条（分享歌曲/歌单/文本/图片等），只取能展示与可操作的最小集 */
+    data class EventItem(
+        val id: Long,
+        val timeMs: Long,
+        val text: String,
+        val song: Song?,
+        val playlistId: Long,
+        val playlistName: String?,
+        val hasImages: Boolean
+    )
+
+    data class EventPage(
+        val items: List<EventItem>,
+        val nextTime: Long,
+        val hasMore: Boolean
+    )
+
+    /**
+     * 某用户的动态（GET /api/event/get/{userId}，翻页游标 [EventPage.nextTime]，
+     * 首页传 -1）。返回结构顶层 `events`，每条 json 为字符串。
+     */
+    fun userEvents(uid: Long, lasttime: Long = -1L, limit: Int = 20): EventPage {
+        val j = httpGetJson(
+            "/api/event/get/$uid?userId=$uid&lasttime=$lasttime&limit=$limit&getcounts=true"
+        )
+        checkCode(j, "user events")
+        val arr = j.optJSONArray("events") ?: return EventPage(emptyList(), -1L, false)
+        val items = buildList {
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val id = o.optLong("eventId", 0L)
+                if (id == 0L) continue
+                val jsonStr = o.optString("json")
+                val jo = if (jsonStr.isNotEmpty()) {
+                    try {
+                        JSONObject(jsonStr)
+                    } catch (_: Exception) {
+                        null
+                    }
+                } else {
+                    null
+                }
+                val text = jo?.optString("msg").orEmpty()
+                    .ifBlank { jo?.optString("shareContent").orEmpty() }
+                    .trim()
+                val song = jo?.optJSONObject("song")?.let { so ->
+                    try {
+                        Json.parseSong(so)
+                    } catch (_: Exception) {
+                        null
+                    }
+                }
+                val playlist = jo?.optJSONObject("playlist")
+                add(
+                    EventItem(
+                        id = id,
+                        timeMs = o.optLong("showTime", 0L),
+                        text = text,
+                        song = song?.takeIf { it.id != 0L },
+                        playlistId = playlist?.optLong("id", 0L) ?: 0L,
+                        playlistName = playlist?.let { Json.strOrNull(it, "name") },
+                        hasImages = (jo?.optJSONArray("pics")?.length() ?: 0) > 0
+                    )
+                )
+            }
+        }
+        val next = j.optLong("lasttime", items.lastOrNull()?.timeMs ?: -1L)
+        return EventPage(items = items, nextTime = next, hasMore = j.optBoolean("more", false))
+    }
+
+    /** 普通 HTTP GET（非 weapi 加密）拿 JSON，用于动态等纯 GET 接口 */
+    private fun httpGetJson(path: String): JSONObject {
+        val request = Request.Builder()
+            .url(HOST + path)
+            .headers(headers())
+            .build()
+        client.newCall(request).execute().use { resp ->
+            val text = resp.body?.string() ?: ""
+            if (!resp.isSuccessful) throw IOException("HTTP ${resp.code}: $text")
+            return JSONObject(if (text.isEmpty()) "{}" else text)
+        }
+    }
+
+    /** 听歌排行里的一首：歌曲 + 播放次数 */
+    data class RecordEntry(val song: Song, val playCount: Int)
+
+    /** 听歌排行：type 0=所有时间 1=最近一周（响应顶层 allData/weekData） */
+    fun playRecord(uid: Long, type: Int = 0): List<RecordEntry> {
+        val j = JSONObject(
+            weapiPost(
+                "/api/v1/play/record",
+                mapOf("uid" to uid, "type" to type, "limit" to 100, "offset" to 0, "total" to true)
+            )
+        )
+        checkCode(j, "play record")
+        val arr = if (type == 1) j.optJSONArray("weekData") else j.optJSONArray("allData")
+            ?: return emptyList()
+        return buildList {
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val songObj = o.optJSONObject("song") ?: continue
+                val song = Json.parseSong(songObj)
+                if (song.id == 0L) continue
+                add(RecordEntry(song, o.optInt("playCount", 0)))
+            }
+        }
     }
 
     // ───────────────────────── 解析辅助 ─────────────────────────

@@ -27,13 +27,16 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -55,9 +58,11 @@ import app.melodrift.music.net.Playlist
 import app.melodrift.music.net.Song
 import app.melodrift.music.player.PlayerController
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
     cookie: String,
@@ -66,21 +71,40 @@ fun HomeScreen(
     onPlaySongs: (List<Song>, Int) -> Unit,
     onOpenPlayer: () -> Unit,
     onOpenSearch: () -> Unit,
-    onOpenSettingsPage: () -> Unit
+    onOpenSettingsPage: () -> Unit,
+    onOpenUser: (Long, String) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     var account by remember { mutableStateOf<NcmApi.AccountInfo?>(null) }
     var dailyLoading by remember { mutableStateOf(false) }
     val dailyTitle = stringResource(R.string.daily_recommend)
 
-    // 账号信息（cookie 变化时刷新；60s 内复用缓存，避免频繁请求）
-    LaunchedEffect(cookie) {
+    // 下拉刷新：递增 refreshKey 让各 AsyncContent 重拉，accountKey 强制重取账号
+    var isRefreshing by remember { mutableStateOf(false) }
+    var refreshKey by remember { mutableStateOf(0) }
+    var accountKey by remember { mutableStateOf(0) }
+
+    val onRefresh: () -> Unit = refresh@{
+        if (isRefreshing) return@refresh
+        isRefreshing = true
+        HomeAccountCache.clear()
+        refreshKey++
+        accountKey++
+        scope.launch {
+            // 子加载在后台完成，指示器给个最短展示时间后收手
+            delay(1200)
+            isRefreshing = false
+        }
+    }
+
+    // 账号信息（cookie 或下拉刷新变化时刷新；60s 内复用缓存，避免频繁请求）
+    LaunchedEffect(cookie, accountKey) {
         account = null
         if (cookie.isBlank()) {
             HomeAccountCache.clear()
             return@LaunchedEffect
         }
-        if (HomeAccountCache.fresh) {
+        if (accountKey == 0 && HomeAccountCache.fresh) {
             account = HomeAccountCache.value
             return@LaunchedEffect
         }
@@ -112,11 +136,16 @@ fun HomeScreen(
         }
     }
 
-    LazyColumn(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(horizontal = dimensionResource(R.dimen.page_padding))
+    PullToRefreshBox(
+        isRefreshing = isRefreshing,
+        onRefresh = onRefresh,
+        modifier = Modifier.fillMaxSize()
     ) {
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = dimensionResource(R.dimen.page_padding))
+        ) {
         // 问候
         item {
             Row(
@@ -127,11 +156,8 @@ fun HomeScreen(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        if (account != null) {
-                            stringResource(R.string.hello_user, account!!.nickname)
-                        } else {
-                            stringResource(R.string.hello_guest)
-                        },
+                        account?.let { stringResource(R.string.hello_user, it.nickname) }
+                            ?: stringResource(R.string.hello_guest),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.SemiBold
                     )
@@ -159,8 +185,17 @@ fun HomeScreen(
                         tint = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                // 头像（最右）
-                Avatar(url = account?.avatarUrl, modifier = Modifier.size(44.dp))
+                // 头像（最右）：点进自己的个人主页
+                val me = account
+                Box(
+                    modifier = Modifier
+                        .clip(CircleShape)
+                        .clickable(enabled = me != null) {
+                            if (me != null) onOpenUser(me.userId, me.nickname)
+                        }
+                ) {
+                    Avatar(url = me?.avatarUrl, modifier = Modifier.size(44.dp))
+                }
             }
         }
 
@@ -219,7 +254,7 @@ fun HomeScreen(
         item {
             AsyncContent(
                 load = { NcmApi.personalizedPlaylists(8) },
-                retryKey = "personalized"
+                retryKey = "personalized-$refreshKey"
             ) { playlists ->
                 if (playlists.isEmpty()) {
                     Text(
@@ -243,7 +278,7 @@ fun HomeScreen(
         item {
             AsyncContent(
                 load = { NcmApi.toplists() },
-                retryKey = "toplist"
+                retryKey = "toplist-$refreshKey"
             ) { lists ->
                 val picks = pickHotToplists(lists)
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -267,7 +302,8 @@ fun HomeScreen(
             }
         }
 
-        item { Spacer(Modifier.height(dimensionResource(R.dimen.space_m))) }
+        item { Spacer(Modifier.height(dimensionResource(R.dimen.list_bottom_padding))) }
+        }
     }
 }
 

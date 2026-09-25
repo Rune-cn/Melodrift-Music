@@ -264,7 +264,36 @@ Make sure a valid cookie (MUSIC_U) is set in Settings.</string>
     <string name="detail_lyricist">Lyricist</string>
     <string name="detail_composer">Composer</string>
     <string name="detail_arranger">Arranger</string>
+    <string name="detail_intro">Description</string>
+    <string name="expand">Expand</string>
+    <string name="collapse">Collapse</string>
     <string name="license">Open source license</string>
     <string name="license_brief">This app is open source under GPL-3.0-only (see LICENSE in the repository).</string>
     <string name="license_open_full">View full license</string>
+
+    <string name="user_home">User Profile</string>
+    <string name="user_tab_events">Posts (%1$d)</string>
+    <string name="user_tab_playlists">Playlists (%1$d)</string>
+    <string name="user_tab_record">Top Songs (%1$d)</string>
+    <string name="user_level_badge">Lv. %1$d</string>
+    <string name="user_record_week">Past 7 Days</string>
+    <string name="user_record_all">All Time</string>
+    <string name="user_follows">Following</string>
+    <string name="user_fans">Followers</string>
+    <string name="user_songs">Listened</string>
+    <string name="vip_badge">VIP</string>
+    <string name="playlist_track_count">%1$d tracks</string>
+    <string name="user_plays_count">%1$s plays</string>
+    <string name="user_no_playlists">No playlists yet</string>
+    <string name="user_no_record">No listening history</string>
+    <string name="user_no_followers">No followers yet</string>
+    <string name="user_no_following">Not following anyone</string>
+    <string name="user_events">Posts</string>
+    <string name="user_no_events">No posts yet</string>
+    <string name="user_events_private">No visible posts (may be set to private)</string>
+    <string name="user_events_no_more">No more posts</string>
+    <string name="event_has_images">Photo</string>
+    <string name="event_share_song">Shared a song</string>
+    <string name="event_share_playlist">Shared a playlist</string>
+    <string name="event_share_photo">Photo post</string>
 </resources>

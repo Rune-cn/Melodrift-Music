@@ -32,9 +32,12 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -88,7 +91,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -188,8 +194,7 @@ class MainActivity : ComponentActivity() {
             }
             // 外观设置：进度条样式 / 歌词渐变 / 迷你条样式
             LaunchedEffect(settings.progressStyle, settings.lyricsFade) {
-                PlayerController.progressStyle = settings.progressStyle
-                PlayerController.lyricsFade = settings.lyricsFade
+                PlayerController.setAppearance(settings.progressStyle, settings.lyricsFade)
             }
 
             // 首次启动：弹出 用户协议 / 隐私政策 / 免责声明
@@ -241,15 +246,17 @@ class MainActivity : ComponentActivity() {
 // 导航（返回栈）
 // ═══════════════════════════════════════════════════════════════════
 
-private sealed interface Screen {
-    data object Home : Screen
-    data object Search : Screen
-    data object Library : Screen
-    data object Settings : Screen
-    data class Playlist(val id: Long, val name: String) : Screen
-    data class SongList(val title: String, val songs: List<Song>) : Screen
-    data object Player : Screen
-}
+    private sealed interface Screen {
+        data object Home : Screen
+        data object Search : Screen
+        data object Library : Screen
+        data object Settings : Screen
+        data class Playlist(val id: Long, val name: String) : Screen
+        data class SongList(val title: String, val songs: List<Song>) : Screen
+        data class UserHome(val uid: Long, val name: String) : Screen
+        data class UserList(val uid: Long, val title: String, val fans: Boolean) : Screen
+        data object Player : Screen
+    }
 
 private data class TabItem(
     val label: String,
@@ -361,24 +368,6 @@ private fun MelodriftApp(
     Scaffold(
         bottomBar = {
             Column {
-                // 迷你播放条：所有非播放页常驻（无歌也显示占位）；播放页打开时快速落下。
-                // 点击进入播放页；上拉 → 预览式升起（过阈值才真正进入，不足回弹）
-                AnimatedVisibility(
-                    visible = current !is Screen.Player,
-                    enter = slideInVertically(tween(220)) { it } + fadeIn(tween(220)),
-                    exit = slideOutVertically(tween(90)) { it } + fadeOut(tween(90))
-                ) {
-                    MiniPlayerBar(
-                        onOpenPlayer = { openPlayerFromBar() },
-                        onCommitPreview = { commitPlayerPreview() },
-                        style = settings.miniBarStyle,
-                        playerOffsetY = playerOffsetY,
-                        scope = scope,
-                        screenHeightPx = screenHeightPx,
-                        active = current !is Screen.Player,
-                        onPreviewingChange = { previewingPlayer = it }
-                    )
-                }
                 // 底部导航（仅根页面；播放页打开时快速滑出）
                 AnimatedVisibility(
                     visible = showTabs,
@@ -444,7 +433,8 @@ private fun MelodriftApp(
                         onPlaySongs = onPlaySongs,
                         onOpenPlayer = { showPlayer() },
                         onOpenSearch = { push(Screen.Search) },
-                        onOpenSettingsPage = { push(Screen.Settings) }
+                        onOpenSettingsPage = { push(Screen.Settings) },
+                        onOpenUser = { uid, name -> push(Screen.UserHome(uid, name)) }
                     )
                     is Screen.Search -> SearchScreen(
                         cookie = settings.cookie,
@@ -476,7 +466,36 @@ private fun MelodriftApp(
                         onBack = pop,
                         onPlaySongs = onPlaySongs
                     )
-                    is Screen.Player -> PlayerScreen(onBack = pop)
+                    is Screen.UserHome -> {
+                        val fansTitle = stringResource(R.string.user_fans)
+                        val followsTitle = stringResource(R.string.user_follows)
+                        UserHomeScreen(
+                            uid = screen.uid,
+                            onBack = pop,
+                            onOpenPlaylist = { id, name -> push(Screen.Playlist(id, name)) },
+                            onPlaySongs = onPlaySongs,
+                            onOpenUserList = { fans ->
+                                push(
+                                    Screen.UserList(
+                                        uid = screen.uid,
+                                        title = if (fans) fansTitle else followsTitle,
+                                        fans = fans
+                                    )
+                                )
+                            }
+                        )
+                    }
+                    is Screen.UserList -> UserListScreen(
+                        uid = screen.uid,
+                        title = screen.title,
+                        fans = screen.fans,
+                        onBack = pop,
+                        onOpenUser = { uid, name -> push(Screen.UserHome(uid, name)) }
+                    )
+                    is Screen.Player -> PlayerScreen(
+                        onBack = pop,
+                        onOpenUser = { uid, name -> push(Screen.UserHome(uid, name)) }
+                    )
                 }
             }
             }
@@ -490,9 +509,29 @@ private fun MelodriftApp(
             ) {
                 PlayerOverlay(
                     onBack = { closePlayerOverlay() },
+                    onOpenUser = { uid, name -> push(Screen.UserHome(uid, name)) },
                     playerOffsetY = playerOffsetY,
                     scope = scope,
                     screenHeightPx = screenHeightPx
+                )
+            }
+            // 迷你播放条：悬浮在内容层之上（半透明，列表文字可从后面透过来）。
+            // 仅在有歌且非播放页时出现；无歌不显示；点击进播放页、上拉预览。
+            AnimatedVisibility(
+                visible = current !is Screen.Player && PlayerController.current != null,
+                enter = slideInVertically(tween(220)) { it } + fadeIn(tween(220)),
+                exit = slideOutVertically(tween(90)) { it } + fadeOut(tween(90)),
+                modifier = Modifier.align(Alignment.BottomCenter)
+            ) {
+                MiniPlayerBar(
+                    onOpenPlayer = { openPlayerFromBar() },
+                    onCommitPreview = { commitPlayerPreview() },
+                    style = settings.miniBarStyle,
+                    playerOffsetY = playerOffsetY,
+                    scope = scope,
+                    screenHeightPx = screenHeightPx,
+                    active = current !is Screen.Player,
+                    onPreviewingChange = { previewingPlayer = it }
                 )
             }
         }
@@ -521,12 +560,17 @@ private fun MiniPlayerBar(
     val shape = if (style == "square") RoundedCornerShape(0.dp) else RoundedCornerShape(18.dp)
     // 圆角悬浮、方形贴底
     val pad = if (style == "square") 0.dp else 6.dp
+    // 点击去涟漪：仅保留触感 + 按下变暗的「按下去」质感，不显示按钮高亮
+    val barInteraction = remember { MutableInteractionSource() }
+    val barPressed by barInteraction.collectIsPressedAsState()
 
     Surface(
-        color = MaterialTheme.colorScheme.surfaceContainerHighest,
+        // 半透明极简：背景约 55% 不透明度，列表文字可从后面透过来；不再是实体方块
+        color = MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.55f),
         shape = shape,
-        shadowElevation = 0.dp,
+        shadowElevation = 6.dp,
         modifier = Modifier
+            .alpha(if (barPressed) 0.72f else 1f)
             .fillMaxWidth()
             .padding(horizontal = if (style == "square") 0.dp else 10.dp, vertical = pad)
             // iOS 式上拉：播放页只做"预览式"跟手升起——不进页面栈；
@@ -612,8 +656,14 @@ private fun MiniPlayerBar(
                     }
                 )
             }
-            // 点击打开播放页：放在 pointerInput **之后**，让上拉手势先拿到事件
-            .clickable(enabled = active && song != null, onClick = onOpenPlayer)
+            // 点击打开播放页：放在 pointerInput **之后**，让上拉手势先拿到事件；
+            // indication=null 去掉按钮按压高亮，保留点击
+            .clickable(
+                interactionSource = barInteraction,
+                indication = null,
+                enabled = active && song != null,
+                onClick = onOpenPlayer
+            )
     ) {
         Row(
             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
@@ -800,6 +850,7 @@ private fun LegalEntry(title: String, onClick: () -> Unit) {
 @Composable
 private fun PlayerOverlay(
     onBack: () -> Unit,
+    onOpenUser: (Long, String) -> Unit,
     playerOffsetY: Animatable<Float, AnimationVector1D>,
     scope: CoroutineScope,
     screenHeightPx: Float
@@ -865,7 +916,20 @@ private fun PlayerOverlay(
                 translationY = playerOffsetY.value
             }
     ) {
-        PlayerScreen(onBack = onBack)
+        // 上拉预览/进入播放页时的渐变遮罩：面板顶沿从实体渐变到透明，升起过程不生硬
+        Box(
+            Modifier
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .height(96.dp)
+                .background(
+                    Brush.verticalGradient(
+                        0f to MaterialTheme.colorScheme.surfaceContainerHighest.copy(alpha = 0.92f),
+                        1f to Color.Transparent
+                    )
+                )
+        )
+        PlayerScreen(onBack = onBack, onOpenUser = onOpenUser)
     }
 }
 

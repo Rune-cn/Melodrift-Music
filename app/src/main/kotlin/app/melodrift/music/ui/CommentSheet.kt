@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
@@ -49,6 +50,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.dimensionResource
@@ -62,12 +64,11 @@ import app.melodrift.music.net.Comment
 import app.melodrift.music.net.CommentSort
 import app.melodrift.music.net.NcmApi
 import app.melodrift.music.net.Song
+import app.melodrift.music.net.ioNet
 import java.text.DateFormat
 import java.util.Date
 import java.util.Locale
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 /*
  * 歌曲评论面板：播放页三点菜单最上方「评论」进入。
@@ -101,10 +102,14 @@ private fun sortLabel(sort: CommentSort): String = stringResource(
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun CommentSheet(song: Song, onDismiss: () -> Unit) {
+fun CommentSheet(
+    song: Song,
+    onDismiss: () -> Unit,
+    onOpenUser: (Long, String) -> Unit
+) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
-        CommentsContent(song = song, onClose = onDismiss)
+        CommentsContent(song = song, onClose = onDismiss, onOpenUser = onOpenUser)
     }
 }
 
@@ -134,7 +139,7 @@ private class TabState {
 }
 
 @Composable
-private fun CommentsContent(song: Song, onClose: () -> Unit) {
+private fun CommentsContent(song: Song, onClose: () -> Unit, onOpenUser: (Long, String) -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     val tabs = remember { SORT_ORDER.associateWith { TabState() } }
@@ -152,10 +157,8 @@ private fun CommentsContent(song: Song, onClose: () -> Unit) {
         t.loading = true
         t.failed = false
         t.noMore = false
-        val page = try {
-            withContext(Dispatchers.IO) { NcmApi.comments(song.id, offset = 0, limit = PAGE, sort = sort) }
-        } catch (_: Exception) {
-            null
+        val page = ioNet {
+            NcmApi.comments(song.id, offset = 0, limit = PAGE, sort = sort)
         }
         if (page == null) t.failed = true else {
             t.total = page.total
@@ -174,14 +177,10 @@ private fun CommentsContent(song: Song, onClose: () -> Unit) {
     suspend fun loadMore() {
         if (tab.loadingMore || tab.noMore || tab.loading || tab.failed) return
         tab.loadingMore = true
-        val page = try {
-            withContext(Dispatchers.IO) {
-                NcmApi.comments(
-                    song.id, offset = tab.items.size, limit = PAGE, sort = sort
-                )
-            }
-        } catch (_: Exception) {
-            null
+        val page = ioNet {
+            NcmApi.comments(
+                song.id, offset = tab.items.size, limit = PAGE, sort = sort
+            )
         }
         if (page == null) {
             tab.noMore = true
@@ -200,11 +199,7 @@ private fun CommentsContent(song: Song, onClose: () -> Unit) {
         tab.replaceWhere(target.id) {
             it.copy(liked = wantLike, likedCount = (it.likedCount + delta).coerceAtLeast(0))
         }
-        val ok = try {
-            withContext(Dispatchers.IO) { NcmApi.commentLike(song.id, target.id, wantLike) }
-        } catch (_: Exception) {
-            false
-        }
+        val ok = ioNet { NcmApi.commentLike(song.id, target.id, wantLike) } ?: false
         if (!ok) {
             tab.replaceWhere(target.id) {
                 it.copy(liked = !wantLike, likedCount = (it.likedCount - delta).coerceAtLeast(0))
@@ -219,12 +214,8 @@ private fun CommentsContent(song: Song, onClose: () -> Unit) {
         val first = tab.floors[parent.id].isNullOrEmpty()
         val cursor = if (first) -1L else tab.floorCursor[parent.id] ?: -1L
         val limit = if (preview) FLOOR_PREVIEW else FLOOR_PAGE
-        val page = try {
-            withContext(Dispatchers.IO) {
-                NcmApi.commentFloors(song.id, parent.id, time = cursor, limit = limit)
-            }
-        } catch (_: Exception) {
-            null
+        val page = ioNet {
+            NcmApi.commentFloors(song.id, parent.id, time = cursor, limit = limit)
         }
         if (page != null) {
             val list = tab.floors.getOrPut(parent.id) { mutableListOf() }
@@ -251,14 +242,10 @@ private fun CommentsContent(song: Song, onClose: () -> Unit) {
         if (text.isEmpty() || sending) return
         sending = true
         val target = replyTarget
-        val ok = try {
-            withContext(Dispatchers.IO) {
-                if (target == null) NcmApi.addComment(song.id, text)
-                else NcmApi.replyComment(song.id, target.id, text)
-            }
-        } catch (_: Exception) {
-            false
-        }
+        val ok = ioNet {
+            if (target == null) NcmApi.addComment(song.id, text)
+            else NcmApi.replyComment(song.id, target.id, text)
+        } ?: false
         sending = false
         if (ok) {
             input = ""
@@ -411,7 +398,8 @@ private fun CommentsContent(song: Song, onClose: () -> Unit) {
                                 }
                             },
                             onLikeComment = { target -> scope.launch { toggleLike(target) } },
-                            onReply = { target -> replyTarget = target }
+                            onReply = { target -> replyTarget = target },
+                            onOpenUser = onOpenUser
                         )
                     }
                     item(key = "${sort}_footer") {
@@ -582,7 +570,8 @@ private fun CommentBlock(
     onLoadPreview: () -> Unit,
     onForceLoad: () -> Unit,
     onLikeComment: (Comment) -> Unit,
-    onReply: (Comment) -> Unit
+    onReply: (Comment) -> Unit,
+    onOpenUser: (Long, String) -> Unit
 ) {
     // 只有从未加载过（IDLE）才自动拉首屏预览；收起/无追评/加载中都交给状态机
     LaunchedEffect(comment.id) {
@@ -594,7 +583,13 @@ private fun CommentBlock(
             .padding(vertical = dimensionResource(R.dimen.space_m))
     ) {
         Row(verticalAlignment = Alignment.Top) {
-            Avatar(comment.avatarUrl, Modifier.size(dimensionResource(R.dimen.comment_avatar)))
+            Box(
+                Modifier
+                    .clip(CircleShape)
+                    .clickable { onOpenUser(comment.userId, comment.nickname) }
+            ) {
+                Avatar(comment.avatarUrl, Modifier.size(dimensionResource(R.dimen.comment_avatar)))
+            }
             Spacer(Modifier.width(dimensionResource(R.dimen.space_m)))
             Column(Modifier.weight(1f)) {
                 Text(
@@ -602,10 +597,13 @@ private fun CommentBlock(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable { onOpenUser(comment.userId, comment.nickname) }
                 )
                 Spacer(Modifier.height(dimensionResource(R.dimen.space_xs)))
-                Text(
+                EmojiText(
                     comment.content,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = if (expandedContent) Int.MAX_VALUE else 5,
@@ -636,8 +634,7 @@ private fun CommentBlock(
                     Text(
                         meta,
                         style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.weight(1f, fill = false)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
 
@@ -682,7 +679,8 @@ private fun CommentBlock(
                             FloorRow(
                                 comment = f,
                                 onLike = { onLikeComment(f) },
-                                onReply = { onReply(f) }
+                                onReply = { onReply(f) },
+                                onOpenUser = onOpenUser
                             )
                         }
                         if (floorState == FloorState.LOADING) {
@@ -791,14 +789,25 @@ private fun LikeColumn(
 
 /** 追评行：比主评论小一档，本身不再展开 */
 @Composable
-private fun FloorRow(comment: Comment, onLike: () -> Unit, onReply: () -> Unit) {
+private fun FloorRow(
+    comment: Comment,
+    onLike: () -> Unit,
+    onReply: () -> Unit,
+    onOpenUser: (Long, String) -> Unit
+) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = dimensionResource(R.dimen.space_s)),
         verticalAlignment = Alignment.Top
     ) {
-        Avatar(comment.avatarUrl, Modifier.size(dimensionResource(R.dimen.comment_floor_avatar)))
+        Box(
+            Modifier
+                .clip(CircleShape)
+                .clickable { onOpenUser(comment.userId, comment.nickname) }
+        ) {
+            Avatar(comment.avatarUrl, Modifier.size(dimensionResource(R.dimen.comment_floor_avatar)))
+        }
         Spacer(Modifier.width(dimensionResource(R.dimen.space_s)))
         Column(Modifier.weight(1f)) {
             Text(
@@ -806,9 +815,12 @@ private fun FloorRow(comment: Comment, onLike: () -> Unit, onReply: () -> Unit) 
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier
+                    .clip(MaterialTheme.shapes.small)
+                    .clickable { onOpenUser(comment.userId, comment.nickname) }
             )
-            Text(
+            EmojiText(
                 comment.content,
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 4,
